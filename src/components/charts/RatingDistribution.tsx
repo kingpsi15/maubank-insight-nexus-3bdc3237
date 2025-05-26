@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const RatingDistribution = () => {
   const data = [
@@ -42,9 +42,9 @@ const RatingDistribution = () => {
             formatter={(value: any, name: any, props: any) => [value, `${props.payload.label} (${props.payload.rating}★)`]}
             labelFormatter={(label) => `Rating: ${label}★`}
           />
-          <Bar dataKey="count" fill="#3B82F6">
+          <Bar dataKey="count">
             {data.map((entry, index) => (
-              <Bar key={`bar-${index}`} fill={getBarColor(entry.rating)} />
+              <Cell key={`cell-${index}`} fill={getBarColor(entry.rating)} />
             ))}
           </Bar>
         </BarChart>

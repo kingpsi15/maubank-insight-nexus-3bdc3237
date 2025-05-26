@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const IssuesChart = () => {
   const data = [
@@ -45,9 +45,9 @@ const IssuesChart = () => {
               `Occurrences (${props.payload.service})`
             ]}
           />
-          <Bar dataKey="count" fill="#3B82F6">
+          <Bar dataKey="count">
             {data.map((entry, index) => (
-              <Bar key={`bar-${index}`} fill={getBarColor(entry.service)} />
+              <Cell key={`cell-${index}`} fill={getBarColor(entry.service)} />
             ))}
           </Bar>
         </BarChart>
