@@ -4,13 +4,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const LocationChart = () => {
   const data = [
-    { location: 'Mumbai', positive: 423, negative: 167, avgRating: 4.1 },
-    { location: 'Delhi', positive: 356, negative: 189, avgRating: 3.8 },
-    { location: 'Bangalore', positive: 298, negative: 145, avgRating: 4.0 },
-    { location: 'Chennai', positive: 234, negative: 123, avgRating: 3.9 },
-    { location: 'Hyderabad', positive: 189, negative: 98, avgRating: 4.2 },
-    { location: 'Pune', positive: 167, negative: 87, avgRating: 4.0 },
-    { location: 'Kolkata', positive: 145, negative: 76, avgRating: 3.7 }
+    { location: 'Kuala Lumpur', positive: 423, negative: 167, avgRating: 4.1 },
+    { location: 'Selangor', positive: 356, negative: 189, avgRating: 3.8 },
+    { location: 'Penang', positive: 298, negative: 145, avgRating: 4.0 },
+    { location: 'Johor Bahru', positive: 234, negative: 123, avgRating: 3.9 },
+    { location: 'Melaka', positive: 189, negative: 98, avgRating: 4.2 },
+    { location: 'Ipoh', positive: 167, negative: 87, avgRating: 4.0 },
+    { location: 'Kota Kinabalu', positive: 145, negative: 76, avgRating: 3.7 }
   ];
 
   return (

@@ -5,8 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 const SentimentChart = () => {
   const data = [
     { name: 'Positive', value: 1847, color: '#10B981' },
-    { name: 'Negative', value: 892, color: '#EF4444' },
-    { name: 'Neutral/No Rating', value: 108, color: '#6B7280' }
+    { name: 'Negative', value: 1000, color: '#EF4444' }
   ];
 
   const RADIAN = Math.PI / 180;

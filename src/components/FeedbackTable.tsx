@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,19 +15,19 @@ interface FeedbackTableProps {
 const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTableProps) => {
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
 
-  // Mock feedback data
+  // Mock feedback data based on Mau Bank Malaysia
   const feedbackData = [
     {
       id: 'F001',
       date: '2025-05-25',
-      customerName: 'John Doe',
-      customerPhone: '+91-9876543210',
-      customerEmail: 'john.doe@email.com',
+      customerName: 'Ahmad Rahman',
+      customerPhone: '+60-12-3456789',
+      customerEmail: 'ahmad.rahman@email.com',
       serviceType: 'ATM',
-      reviewText: 'The ATM at Mumbai branch was very slow and my card got stuck. Had to wait for 30 minutes for assistance.',
+      reviewText: 'ATM di cawangan Kuala Lumpur sangat perlahan dan kad saya tersekat. Terpaksa menunggu 30 minit untuk bantuan.',
       reviewRating: 2,
-      issueLocation: 'Mumbai',
-      contactedBankPerson: 'Rajesh Kumar',
+      issueLocation: 'Kuala Lumpur',
+      contactedBankPerson: 'Siti Aminah',
       status: 'in_progress',
       detectedIssues: ['ATM card stuck', 'Slow transaction'],
       sentiment: 'negative'
@@ -36,14 +35,14 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
     {
       id: 'F002',
       date: '2025-05-24',
-      customerName: 'Sarah Smith',
-      customerPhone: '+91-9876543211',
-      customerEmail: 'sarah.smith@email.com',
+      customerName: 'Sarah Lim',
+      customerPhone: '+60-16-7891234',
+      customerEmail: 'sarah.lim@email.com',
       serviceType: 'OnlineBanking',
-      reviewText: 'The online banking system is fantastic! Very user-friendly and secure. Love the new mobile app updates.',
+      reviewText: 'Sistem perbankan dalam talian sangat bagus! Mudah digunakan dan selamat. Suka dengan kemaskini aplikasi mudah alih yang baru.',
       reviewRating: 5,
-      issueLocation: 'Delhi',
-      contactedBankPerson: 'Priya Sharma',
+      issueLocation: 'Selangor',
+      contactedBankPerson: 'Lee Wei Ming',
       status: 'resolved',
       detectedIssues: ['Positive feedback'],
       sentiment: 'positive'
@@ -51,14 +50,14 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
     {
       id: 'F003',
       date: '2025-05-23',
-      customerName: 'Mike Johnson',
-      customerPhone: '+91-9876543212',
-      customerEmail: 'mike.j@email.com',
+      customerName: 'Raj Kumar',
+      customerPhone: '+60-19-2345678',
+      customerEmail: 'raj.kumar@email.com',
       serviceType: 'CoreBanking',
-      reviewText: 'Money transfer has been pending for 3 days. Very frustrating experience with customer service.',
+      reviewText: 'Pemindahan wang tertangguh selama 3 hari. Pengalaman yang sangat mengecewakan dengan perkhidmatan pelanggan.',
       reviewRating: 1,
-      issueLocation: 'Bangalore',
-      contactedBankPerson: 'Amit Patel',
+      issueLocation: 'Penang',
+      contactedBankPerson: 'Nurul Huda',
       status: 'escalated',
       detectedIssues: ['Transaction delay', 'Poor customer service'],
       sentiment: 'negative'
@@ -66,14 +65,14 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
     {
       id: 'F004',
       date: '2025-05-22',
-      customerName: 'Lisa Chen',
-      customerPhone: '+91-9876543213',
-      customerEmail: 'lisa.chen@email.com',
+      customerName: 'Fatimah Zahra',
+      customerPhone: '+60-13-8765432',
+      customerEmail: 'fatimah.zahra@email.com',
       serviceType: 'OnlineBanking',
-      reviewText: 'Quick and easy loan application process through the website. Very satisfied with the service.',
+      reviewText: 'Proses permohonan pinjaman yang cepat dan mudah melalui laman web. Sangat berpuas hati dengan perkhidmatan.',
       reviewRating: 4,
-      issueLocation: 'Chennai',
-      contactedBankPerson: 'Sneha Reddy',
+      issueLocation: 'Johor Bahru',
+      contactedBankPerson: 'Muhammad Hafiz',
       status: 'resolved',
       detectedIssues: ['Positive feedback'],
       sentiment: 'positive'
@@ -81,14 +80,14 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
     {
       id: 'F005',
       date: '2025-05-21',
-      customerName: 'Robert Wilson',
-      customerPhone: '+91-9876543214',
-      customerEmail: 'robert.w@email.com',
+      customerName: 'Chen Wei',
+      customerPhone: '+60-17-5432109',
+      customerEmail: 'chen.wei@email.com',
       serviceType: 'ATM',
-      reviewText: 'ATM ran out of cash during peak hours. This happens frequently at this location.',
+      reviewText: 'ATM kehabisan wang tunai semasa waktu puncak. Ini kerap berlaku di lokasi ini.',
       reviewRating: 2,
-      issueLocation: 'Hyderabad',
-      contactedBankPerson: 'Vikram Singh',
+      issueLocation: 'Melaka',
+      contactedBankPerson: 'Azman Ismail',
       status: 'new',
       detectedIssues: ['ATM out of cash'],
       sentiment: 'negative'
@@ -128,9 +127,6 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
   };
 
   const getRatingStars = (rating: number) => {
-    if (rating === 0) {
-      return <span className="text-gray-400">No Rating</span>;
-    }
     return (
       <div className="flex items-center">
         {[...Array(5)].map((_, i) => (
@@ -146,7 +142,7 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
 
   const updateStatus = (feedbackId: string, newStatus: string) => {
     console.log(`Updating feedback ${feedbackId} status to ${newStatus}`);
-    // Here you would update the status in your backend
+    // Here you would update the status in your MySQL backend
   };
 
   return (

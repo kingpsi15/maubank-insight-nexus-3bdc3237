@@ -16,8 +16,8 @@ const Index = () => {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">MauBank VoC Analysis</h1>
-              <p className="text-gray-600 mt-1">Customer Feedback Intelligence & Resolution System</p>
+              <h1 className="text-3xl font-bold text-gray-900">Mau Bank VoC Analysis</h1>
+              <p className="text-gray-600 mt-1">Customer Feedback Intelligence & Resolution System - Malaysia</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg">

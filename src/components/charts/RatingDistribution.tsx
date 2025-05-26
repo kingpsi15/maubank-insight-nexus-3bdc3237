@@ -4,17 +4,15 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const RatingDistribution = () => {
   const data = [
-    { rating: '0', count: 108, label: 'No Rating' },
     { rating: '1', count: 156, label: 'Very Poor' },
     { rating: '2', count: 234, label: 'Poor' },
     { rating: '3', count: 502, label: 'Average' },
     { rating: '4', count: 1203, label: 'Good' },
-    { rating: '5', count: 644, label: 'Excellent' }
+    { rating: '5', count: 752, label: 'Excellent' }
   ];
 
   const getBarColor = (rating: string) => {
     switch (rating) {
-      case '0': return '#6B7280';
       case '1': return '#DC2626';
       case '2': return '#EA580C';
       case '3': return '#D97706';

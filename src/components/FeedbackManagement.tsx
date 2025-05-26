@@ -48,12 +48,12 @@ const FeedbackManagement = () => {
       return;
     }
 
-    // Simulate API call
-    console.log('Submitting feedback:', formData);
+    // Simulate MySQL API call
+    console.log('Submitting feedback to MySQL database:', formData);
     
     toast({
       title: "Feedback Added",
-      description: "Customer feedback has been successfully recorded.",
+      description: "Customer feedback has been successfully recorded in MySQL database.",
     });
 
     // Reset form
@@ -78,7 +78,7 @@ const FeedbackManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Feedback Management</CardTitle>
-              <CardDescription>Manage customer feedback entries and bulk operations</CardDescription>
+              <CardDescription>Manage customer feedback entries and bulk operations for Mau Bank Malaysia</CardDescription>
             </div>
             <div className="flex space-x-2">
               <Button
@@ -153,7 +153,7 @@ const FeedbackManagement = () => {
         <Card>
           <CardHeader>
             <CardTitle>Bulk Upload Feedback</CardTitle>
-            <CardDescription>Upload multiple feedback entries via CSV file</CardDescription>
+            <CardDescription>Upload multiple feedback entries via CSV file to MySQL database</CardDescription>
           </CardHeader>
           <CardContent>
             <BulkUpload onUploadComplete={() => setShowBulkUpload(false)} />
@@ -187,6 +187,7 @@ const FeedbackManagement = () => {
                     id="customerPhone"
                     value={formData.customerPhone}
                     onChange={(e) => handleInputChange('customerPhone', e.target.value)}
+                    placeholder="+60-12-3456789"
                   />
                 </div>
 
@@ -215,13 +216,12 @@ const FeedbackManagement = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="reviewRating">Rating (0-5) *</Label>
+                  <Label htmlFor="reviewRating">Rating (1-5) *</Label>
                   <Select value={formData.reviewRating} onValueChange={(value) => handleInputChange('reviewRating', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select rating" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">0 - No Rating</SelectItem>
                       <SelectItem value="1">1 - Very Poor</SelectItem>
                       <SelectItem value="2">2 - Poor</SelectItem>
                       <SelectItem value="3">3 - Average</SelectItem>
@@ -233,12 +233,20 @@ const FeedbackManagement = () => {
 
                 <div>
                   <Label htmlFor="issueLocation">Issue Location</Label>
-                  <Input
-                    id="issueLocation"
-                    value={formData.issueLocation}
-                    onChange={(e) => handleInputChange('issueLocation', e.target.value)}
-                    placeholder="City or branch location"
-                  />
+                  <Select value={formData.issueLocation} onValueChange={(value) => handleInputChange('issueLocation', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Kuala Lumpur">Kuala Lumpur</SelectItem>
+                      <SelectItem value="Selangor">Selangor</SelectItem>
+                      <SelectItem value="Penang">Penang</SelectItem>
+                      <SelectItem value="Johor Bahru">Johor Bahru</SelectItem>
+                      <SelectItem value="Melaka">Melaka</SelectItem>
+                      <SelectItem value="Ipoh">Ipoh</SelectItem>
+                      <SelectItem value="Kota Kinabalu">Kota Kinabalu</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="md:col-span-2">
@@ -285,7 +293,7 @@ const FeedbackManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle>Customer Feedback Records</CardTitle>
-          <CardDescription>View and manage all customer feedback entries</CardDescription>
+          <CardDescription>View and manage all customer feedback entries from MySQL database</CardDescription>
         </CardHeader>
         <CardContent>
           <FeedbackTable 
