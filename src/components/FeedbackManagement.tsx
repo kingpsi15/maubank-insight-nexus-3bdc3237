@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, Calendar } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useFeedback } from '@/hooks/useFeedback';
 import FeedbackTable from '@/components/FeedbackTable';
@@ -19,10 +19,13 @@ const FeedbackManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
+  const [dateFromFilter, setDateFromFilter] = useState('');
+  const [dateToFilter, setDateToFilter] = useState('');
   const { toast } = useToast();
   const { createFeedback, isCreating } = useFeedback();
 
   const [formData, setFormData] = useState({
+    customerId: '',
     customerName: '',
     customerPhone: '',
     customerEmail: '',
@@ -53,6 +56,7 @@ const FeedbackManagement = () => {
     try {
       // Create feedback object matching database schema
       const feedbackData = {
+        customer_id: formData.customerId || null,
         customer_name: formData.customerName,
         customer_phone: formData.customerPhone || null,
         customer_email: formData.customerEmail || null,
@@ -70,6 +74,7 @@ const FeedbackManagement = () => {
 
       // Reset form
       setFormData({
+        customerId: '',
         customerName: '',
         customerPhone: '',
         customerEmail: '',
@@ -85,6 +90,14 @@ const FeedbackManagement = () => {
     }
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setServiceFilter('all');
+    setDateFromFilter('');
+    setDateToFilter('');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -92,8 +105,8 @@ const FeedbackManagement = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Feedback Management</CardTitle>
-              <CardDescription>Manage customer feedback entries and bulk operations for Mau Bank Malaysia</CardDescription>
+              <CardTitle>Customer Feedback Management</CardTitle>
+              <CardDescription>Comprehensive feedback collection and management system for Mau Bank Malaysia</CardDescription>
             </div>
             <div className="flex space-x-2">
               <Button
@@ -101,7 +114,7 @@ const FeedbackManagement = () => {
                 variant="outline"
                 className="flex items-center"
               >
-                <Upload className="w-4 h-4 mr-2" />
+                <Plus className="w-4 h-4 mr-2" />
                 Bulk Upload
               </Button>
               <Button
@@ -117,7 +130,7 @@ const FeedbackManagement = () => {
 
         <CardContent>
           {/* Search and Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -153,11 +166,38 @@ const FeedbackManagement = () => {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center">
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                type="date"
+                placeholder="From date"
+                value={dateFromFilter}
+                onChange={(e) => setDateFromFilter(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                type="date"
+                placeholder="To date"
+                value={dateToFilter}
+                onChange={(e) => setDateToFilter(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
               <Badge variant="outline" className="flex items-center">
                 <Filter className="w-3 h-3 mr-1" />
-                {searchTerm || statusFilter !== 'all' || serviceFilter !== 'all' ? 'Filtered' : 'All Data'}
+                {searchTerm || statusFilter !== 'all' || serviceFilter !== 'all' || dateFromFilter || dateToFilter ? 'Filtered' : 'All Data'}
               </Badge>
+              {(searchTerm || statusFilter !== 'all' || serviceFilter !== 'all' || dateFromFilter || dateToFilter) && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -165,27 +205,29 @@ const FeedbackManagement = () => {
 
       {/* Bulk Upload */}
       {showBulkUpload && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Bulk Upload Feedback</CardTitle>
-            <CardDescription>Upload multiple feedback entries via CSV file to the database</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BulkUpload onUploadComplete={() => setShowBulkUpload(false)} />
-          </CardContent>
-        </Card>
+        <BulkUpload onUploadComplete={() => setShowBulkUpload(false)} />
       )}
 
       {/* Add Feedback Form */}
       {showAddForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Add New Feedback</CardTitle>
-            <CardDescription>Manually enter customer feedback</CardDescription>
+            <CardTitle>Add New Customer Feedback</CardTitle>
+            <CardDescription>Manually enter customer feedback into the system</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="customerId">Customer ID</Label>
+                  <Input
+                    id="customerId"
+                    value={formData.customerId}
+                    onChange={(e) => handleInputChange('customerId', e.target.value)}
+                    placeholder="CUST001"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="customerName">Customer Name *</Label>
                   <Input
@@ -231,12 +273,13 @@ const FeedbackManagement = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="reviewRating">Rating (1-5) *</Label>
+                  <Label htmlFor="reviewRating">Rating (0-5) *</Label>
                   <Select value={formData.reviewRating} onValueChange={(value) => handleInputChange('reviewRating', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select rating" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="0">0 - No Rating</SelectItem>
                       <SelectItem value="1">1 - Very Poor</SelectItem>
                       <SelectItem value="2">2 - Poor</SelectItem>
                       <SelectItem value="3">3 - Average</SelectItem>
@@ -264,7 +307,7 @@ const FeedbackManagement = () => {
                   </Select>
                 </div>
 
-                <div className="md:col-span-2">
+                <div>
                   <Label htmlFor="contactedBankPerson">Bank Employee Contacted</Label>
                   <Input
                     id="contactedBankPerson"
@@ -315,6 +358,8 @@ const FeedbackManagement = () => {
             searchTerm={searchTerm}
             statusFilter={statusFilter}
             serviceFilter={serviceFilter}
+            dateFromFilter={dateFromFilter}
+            dateToFilter={dateToFilter}
           />
         </CardContent>
       </Card>

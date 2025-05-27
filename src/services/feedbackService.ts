@@ -52,6 +52,16 @@ export const feedbackService = {
     return data;
   },
 
+  async bulkCreate(feedbackList: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>[]) {
+    const { data, error } = await supabase
+      .from('feedback')
+      .insert(feedbackList)
+      .select();
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async update(id: string, updates: Partial<Feedback>) {
     const { data, error } = await supabase
       .from('feedback')
@@ -73,7 +83,13 @@ export const feedbackService = {
     if (error) throw error;
   },
 
-  async getMetrics(filters: { dateRange?: string; service?: string; location?: string } = {}) {
+  async getMetrics(filters: { 
+    dateRange?: string; 
+    service?: string; 
+    location?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}) {
     let query = supabase.from('feedback').select('*');
     
     if (filters.service && filters.service !== 'all') {
@@ -84,7 +100,10 @@ export const feedbackService = {
       query = query.eq('issue_location', filters.location);
     }
 
-    if (filters.dateRange) {
+    // Handle custom date range
+    if (filters.dateFrom && filters.dateTo) {
+      query = query.gte('created_at', filters.dateFrom).lte('created_at', filters.dateTo);
+    } else if (filters.dateRange) {
       const now = new Date();
       let startDate: Date;
       
@@ -115,8 +134,31 @@ export const feedbackService = {
     const total = feedbackData.length;
     const positive = feedbackData.filter(f => f.sentiment === 'positive').length;
     const negative = feedbackData.filter(f => f.sentiment === 'negative').length;
-    const avgRating = feedbackData.length > 0 ? feedbackData.reduce((sum, f) => sum + f.review_rating, 0) / feedbackData.length : 0;
+    const neutral = feedbackData.filter(f => f.sentiment === 'neutral').length;
+    const resolved = feedbackData.filter(f => f.status === 'resolved').length;
+    const pending = feedbackData.filter(f => f.status === 'new' || f.status === 'in_progress').length;
+    const escalated = feedbackData.filter(f => f.status === 'escalated').length;
+    
+    // Calculate rating distribution including 0 ratings
+    const ratingDistribution = [0, 1, 2, 3, 4, 5].map(rating => ({
+      rating,
+      count: feedbackData.filter(f => f.review_rating === rating).length
+    }));
 
-    return { total, positive, negative, avgRating, data: feedbackData };
+    const avgRating = feedbackData.length > 0 ? 
+      feedbackData.reduce((sum, f) => sum + (f.review_rating || 0), 0) / feedbackData.length : 0;
+
+    return { 
+      total, 
+      positive, 
+      negative, 
+      neutral,
+      resolved,
+      pending,
+      escalated,
+      avgRating, 
+      ratingDistribution,
+      data: feedbackData 
+    };
   }
 };
