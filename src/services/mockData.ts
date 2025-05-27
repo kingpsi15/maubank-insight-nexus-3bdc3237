@@ -1,5 +1,5 @@
 
 import { Feedback } from './types';
 
-// Empty mock data - using real database connections
+// No mock data - using real database connections only
 export const mockFeedback: Feedback[] = [];

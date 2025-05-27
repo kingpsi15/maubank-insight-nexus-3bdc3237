@@ -7,8 +7,12 @@ import IssueEndorsement from '@/components/IssueEndorsement';
 import BankEmployeeAnalytics from '@/components/BankEmployeeAnalytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, MessageSquare, Users, CheckCircle } from 'lucide-react';
+import { useFeedbackMetrics } from '@/hooks/useFeedback';
 
 const Index = () => {
+  // Get real metrics from database
+  const { data: overallMetrics, isLoading } = useFeedbackMetrics({});
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -28,7 +32,7 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - Using Real Data */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
@@ -39,8 +43,10 @@ const Index = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2,847</div>
-              <p className="text-green-100 text-sm">+12% from last month</p>
+              <div className="text-2xl font-bold">
+                {isLoading ? "Loading..." : overallMetrics?.total || 0}
+              </div>
+              <p className="text-green-100 text-sm">From database</p>
             </CardContent>
           </Card>
 
@@ -52,8 +58,10 @@ const Index = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4.2</div>
-              <p className="text-blue-100 text-sm">+0.3 improvement</p>
+              <div className="text-2xl font-bold">
+                {isLoading ? "Loading..." : overallMetrics?.avgRating?.toFixed(1) || "0.0"}
+              </div>
+              <p className="text-blue-100 text-sm">Current average</p>
             </CardContent>
           </Card>
 
@@ -65,8 +73,12 @@ const Index = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,934</div>
-              <p className="text-purple-100 text-sm">68% resolution rate</p>
+              <div className="text-2xl font-bold">
+                {isLoading ? "Loading..." : overallMetrics?.resolved || 0}
+              </div>
+              <p className="text-purple-100 text-sm">
+                {isLoading ? "Loading..." : `${Math.round((overallMetrics?.resolved || 0) / (overallMetrics?.total || 1) * 100)}% resolution rate`}
+              </p>
             </CardContent>
           </Card>
 
@@ -74,12 +86,16 @@ const Index = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <Users className="w-5 h-5 mr-2" />
-                Active Employees
+                Positive Feedback
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">47</div>
-              <p className="text-orange-100 text-sm">Handling feedback</p>
+              <div className="text-2xl font-bold">
+                {isLoading ? "Loading..." : overallMetrics?.positive || 0}
+              </div>
+              <p className="text-orange-100 text-sm">
+                {isLoading ? "Loading..." : `${Math.round((overallMetrics?.positive || 0) / (overallMetrics?.total || 1) * 100)}% positive`}
+              </p>
             </CardContent>
           </Card>
         </div>

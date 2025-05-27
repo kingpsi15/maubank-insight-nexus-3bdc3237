@@ -2,6 +2,52 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
+// Simple issue detection based on keywords and sentiment
+const detectIssues = (reviewText: string, sentiment: string, rating: number): string[] => {
+  const issues: string[] = [];
+  const text = reviewText.toLowerCase();
+  
+  // ATM related issues
+  if (text.includes('atm') && (text.includes('not working') || text.includes('broken') || text.includes('down') || text.includes('error'))) {
+    issues.push('ATM malfunction');
+  }
+  
+  // Card issues
+  if (text.includes('card') && (text.includes('blocked') || text.includes('not working') || text.includes('declined'))) {
+    issues.push('Card issues');
+  }
+  
+  // Service issues
+  if (text.includes('service') && (text.includes('poor') || text.includes('bad') || text.includes('slow'))) {
+    issues.push('Poor customer service');
+  }
+  
+  // Charges issues
+  if (text.includes('charge') && (text.includes('hidden') || text.includes('extra') || text.includes('unexpected'))) {
+    issues.push('Unexpected charges');
+  }
+  
+  // App/Online banking issues
+  if ((text.includes('app') || text.includes('online') || text.includes('mobile')) && 
+      (text.includes('crash') || text.includes('not working') || text.includes('error') || text.includes('slow'))) {
+    issues.push('Mobile/Online banking issues');
+  }
+  
+  // Branch issues
+  if (text.includes('branch') && (text.includes('closed') || text.includes('long queue') || text.includes('wait'))) {
+    issues.push('Branch service issues');
+  }
+  
+  // General negative sentiment issues
+  if (sentiment === 'negative' && rating <= 2) {
+    if (issues.length === 0) {
+      issues.push('General service dissatisfaction');
+    }
+  }
+  
+  return issues;
+};
+
 // Feedback operations
 export const feedbackService = {
   async getAll(filters: {
@@ -42,9 +88,17 @@ export const feedbackService = {
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
+    // Auto-detect issues before creating
+    const detectedIssues = detectIssues(feedback.review_text, feedback.sentiment || 'neutral', feedback.review_rating);
+    
+    const feedbackWithIssues = {
+      ...feedback,
+      detected_issues: detectedIssues
+    };
+
     const { data, error } = await supabase
       .from('feedback')
-      .insert([feedback])
+      .insert([feedbackWithIssues])
       .select()
       .single();
     
@@ -53,9 +107,18 @@ export const feedbackService = {
   },
 
   async bulkCreate(feedbackList: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>[]) {
+    // Auto-detect issues for all feedback entries
+    const feedbackWithIssues = feedbackList.map(feedback => {
+      const detectedIssues = detectIssues(feedback.review_text, feedback.sentiment || 'neutral', feedback.review_rating);
+      return {
+        ...feedback,
+        detected_issues: detectedIssues
+      };
+    });
+
     const { data, error } = await supabase
       .from('feedback')
-      .insert(feedbackList)
+      .insert(feedbackWithIssues)
       .select();
     
     if (error) throw error;
@@ -63,6 +126,24 @@ export const feedbackService = {
   },
 
   async update(id: string, updates: Partial<Feedback>) {
+    // Re-detect issues if review text or rating changed
+    if (updates.review_text || updates.review_rating) {
+      const { data: currentFeedback } = await supabase
+        .from('feedback')
+        .select('review_text, sentiment, review_rating')
+        .eq('id', id)
+        .single();
+      
+      if (currentFeedback) {
+        const reviewText = updates.review_text || currentFeedback.review_text;
+        const sentiment = updates.sentiment || currentFeedback.sentiment || 'neutral';
+        const rating = updates.review_rating || currentFeedback.review_rating;
+        
+        const detectedIssues = detectIssues(reviewText, sentiment, rating);
+        updates.detected_issues = detectedIssues;
+      }
+    }
+
     const { data, error } = await supabase
       .from('feedback')
       .update({ ...updates, updated_at: new Date().toISOString() })
