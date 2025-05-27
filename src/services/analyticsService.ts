@@ -350,23 +350,24 @@ export const analyticsService = {
   async getTopIssues(filters: any = {}) {
     console.log('analyticsService.getTopIssues called with filters:', filters);
     
+    // Fetch approved issues with their feedback counts from the issues table
     let query = supabase
       .from('issues')
-      .select('title, feedback_count, category, status')
+      .select('title, feedback_count, category, status, description')
       .eq('status', 'approved')
-      .order('feedback_count', { ascending: false })
-      .limit(10);
+      .order('feedback_count', { ascending: false });
 
     const { data, error } = await query;
     if (error) {
-      console.error('Error fetching issues data:', error);
+      console.error('Error fetching approved issues:', error);
       return [];
     }
 
     const result = data?.map(issue => ({
       issue: issue.title,
       count: issue.feedback_count || 0,
-      category: issue.category
+      category: issue.category,
+      description: issue.description
     })) || [];
 
     console.log('getTopIssues returning:', result);

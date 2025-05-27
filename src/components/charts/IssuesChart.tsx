@@ -17,14 +17,39 @@ const IssuesChart = () => {
   if (!issuesData || issuesData.length === 0) {
     return (
       <div className="h-80 flex items-center justify-center">
-        <div className="text-gray-500">No issues data available</div>
+        <div className="text-gray-500">No approved issues found in the database</div>
       </div>
     );
   }
 
   const getBarColor = (index: number) => {
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#84CC16'];
+    const colors = ['#EF4444', '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#06B6D4', '#84CC16'];
     return colors[index % colors.length];
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-3 border rounded-lg shadow-lg max-w-xs">
+          <p className="font-medium text-gray-900">{label}</p>
+          <p className="text-sm text-blue-600">
+            <span className="font-medium">Count:</span> {payload[0].value}
+          </p>
+          {data.category && (
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Category:</span> {data.category}
+            </p>
+          )}
+          {data.description && (
+            <p className="text-sm text-gray-600 mt-1">
+              <span className="font-medium">Description:</span> {data.description.length > 100 ? `${data.description.substring(0, 100)}...` : data.description}
+            </p>
+          )}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -41,11 +66,9 @@ const IssuesChart = () => {
             type="category"
             dataKey="issue" 
             tick={{ fontSize: 10 }}
-            width={120}
+            width={150}
           />
-          <Tooltip 
-            formatter={(value: any) => [value, 'Occurrences']}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="count">
             {issuesData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={getBarColor(index)} />
