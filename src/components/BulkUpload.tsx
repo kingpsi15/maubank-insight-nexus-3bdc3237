@@ -26,52 +26,85 @@ const BulkUpload = () => {
   const { toast } = useToast();
   const { createFeedback } = useFeedback();
 
-  const defaultColumnMapping = {
-    'Customer Name': 'customer_name',
-    'Customer ID': 'customer_id',
-    'Phone': 'customer_phone', 
-    'Email': 'customer_email',
-    'Service Type': 'service_type',
-    'Review Text': 'review_text',
-    'Rating': 'review_rating',
-    'Location': 'issue_location',
-    'Bank Contact': 'contacted_bank_person',
-    'Date': 'created_at'
+  // Improved column mapping with more flexible matching
+  const getColumnMapping = (headers: string[]) => {
+    const mapping: { [key: string]: string } = {};
+    
+    headers.forEach(header => {
+      const normalizedHeader = header.toLowerCase().trim();
+      
+      // Customer Name variations
+      if (normalizedHeader.includes('customer') && normalizedHeader.includes('name')) {
+        mapping[header] = 'customer_name';
+      }
+      // Customer ID variations
+      else if (normalizedHeader.includes('customer') && normalizedHeader.includes('id')) {
+        mapping[header] = 'customer_id';
+      }
+      // Phone variations
+      else if (normalizedHeader.includes('phone') || normalizedHeader.includes('mobile') || normalizedHeader.includes('contact')) {
+        mapping[header] = 'customer_phone';
+      }
+      // Email variations
+      else if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
+        mapping[header] = 'customer_email';
+      }
+      // Service Type variations
+      else if (normalizedHeader.includes('service') && normalizedHeader.includes('type')) {
+        mapping[header] = 'service_type';
+      }
+      // Review Text variations
+      else if (normalizedHeader.includes('review') && normalizedHeader.includes('text')) {
+        mapping[header] = 'review_text';
+      }
+      // Rating variations
+      else if (normalizedHeader.includes('rating') || normalizedHeader.includes('review') && normalizedHeader.includes('rating')) {
+        mapping[header] = 'review_rating';
+      }
+      // Location variations
+      else if (normalizedHeader.includes('location') || normalizedHeader.includes('issue') && normalizedHeader.includes('location')) {
+        mapping[header] = 'issue_location';
+      }
+      // Bank Contact variations
+      else if (normalizedHeader.includes('bank') && normalizedHeader.includes('contact')) {
+        mapping[header] = 'contacted_bank_person';
+      }
+      else if (normalizedHeader.includes('contacted') && normalizedHeader.includes('bank')) {
+        mapping[header] = 'contacted_bank_person';
+      }
+      // Date variations
+      else if (normalizedHeader.includes('date') || normalizedHeader.includes('created')) {
+        mapping[header] = 'created_at';
+      }
+    });
+    
+    return mapping;
   };
 
   const getServiceTypeMapping = (serviceType: string): string => {
-    const normalizedService = serviceType?.toLowerCase().trim();
+    if (!serviceType) return 'ATM';
+    
+    const normalizedService = serviceType.toLowerCase().trim();
     
     const serviceMap: { [key: string]: string } = {
-      'atm': 'ATM Services',
-      'atm services': 'ATM Services',
-      'atm service': 'ATM Services',
-      'online banking': 'Online Banking',
-      'online': 'Online Banking',
-      'internet banking': 'Online Banking',
-      'mobile banking': 'Mobile Banking',
-      'mobile': 'Mobile Banking',
-      'app': 'Mobile Banking',
-      'branch': 'Branch Services',
-      'branch services': 'Branch Services',
-      'branch service': 'Branch Services',
-      'counter': 'Branch Services',
-      'teller': 'Branch Services',
-      'loan': 'Loan Services',
-      'loans': 'Loan Services',
-      'loan services': 'Loan Services',
-      'credit': 'Credit Services',
-      'credit card': 'Credit Services',
-      'card': 'Card Services',
-      'debit card': 'Card Services',
-      'cards': 'Card Services',
-      'customer service': 'Customer Service',
-      'support': 'Customer Service',
-      'call center': 'Customer Service',
-      'phone': 'Customer Service'
+      'atm': 'ATM',
+      'atm services': 'ATM',
+      'atm service': 'ATM',
+      'online banking': 'OnlineBanking',
+      'online': 'OnlineBanking',
+      'internet banking': 'OnlineBanking',
+      'mobile banking': 'OnlineBanking',
+      'mobile': 'OnlineBanking',
+      'app': 'OnlineBanking',
+      'core banking': 'CoreBanking',
+      'core': 'CoreBanking',
+      'branch': 'CoreBanking',
+      'branch services': 'CoreBanking',
+      'counter': 'CoreBanking',
+      'teller': 'CoreBanking'
     };
 
-    return serviceMap[normalizedService] || serviceType || 'General Services';
+    return serviceMap[normalizedService] || 'ATM';
   };
 
   const parseCSV = (csvText: string): CSVRow[] => {
@@ -95,44 +128,40 @@ const BulkUpload = () => {
     return rows;
   };
 
-  const mapRowToFeedback = (row: CSVRow, rowIndex: number) => {
+  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number) => {
     try {
-      // Auto-detect column mapping
+      const columnMapping = getColumnMapping(headers);
       const mappedRow: any = {};
       
+      // Map columns using the dynamic mapping
       Object.entries(row).forEach(([csvColumn, value]) => {
-        const normalizedColumn = csvColumn.toLowerCase().trim();
-        
-        // Try to find matching column
-        for (const [defaultColumn, dbColumn] of Object.entries(defaultColumnMapping)) {
-          if (normalizedColumn.includes(defaultColumn.toLowerCase()) || 
-              normalizedColumn === dbColumn) {
-            mappedRow[dbColumn] = value;
-            break;
-          }
+        if (columnMapping[csvColumn]) {
+          mappedRow[columnMapping[csvColumn]] = value;
         }
       });
 
-      // Ensure required fields
-      if (!mappedRow.customer_name) {
-        throw new Error(`Row ${rowIndex + 1}: Customer name is required`);
+      // Ensure required fields with better error messages
+      if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
+        throw new Error(`Customer name is required but missing in row ${rowIndex + 1}`);
       }
-      if (!mappedRow.review_text) {
-        throw new Error(`Row ${rowIndex + 1}: Review text is required`);
+      if (!mappedRow.review_text || mappedRow.review_text.trim() === '') {
+        throw new Error(`Review text is required but missing in row ${rowIndex + 1}`);
       }
 
       // Process and validate data
       return {
-        customer_name: mappedRow.customer_name,
+        customer_name: mappedRow.customer_name.trim(),
         customer_id: mappedRow.customer_id || null,
         customer_phone: mappedRow.customer_phone || null,
         customer_email: mappedRow.customer_email || null,
         service_type: getServiceTypeMapping(mappedRow.service_type),
-        review_text: mappedRow.review_text,
+        review_text: mappedRow.review_text.trim(),
         review_rating: parseInt(mappedRow.review_rating) || 0,
         issue_location: mappedRow.issue_location || null,
         contacted_bank_person: mappedRow.contacted_bank_person || null,
-        status: 'new',
+        status: 'new' as const,
+        sentiment: 'neutral' as const,
+        detected_issues: [],
         created_at: mappedRow.created_at ? new Date(mappedRow.created_at).toISOString() : new Date().toISOString()
       };
     } catch (error) {
@@ -142,13 +171,13 @@ const BulkUpload = () => {
 
   const processBatch = async (batch: any[]) => {
     const batchPromises = batch.map(feedback => 
-      new Promise((resolve) => {
-        createFeedback(feedback);
-        resolve(true);
+      createFeedback(feedback).catch(error => {
+        console.error('Error creating feedback:', error);
+        throw error;
       })
     );
     
-    await Promise.all(batchPromises);
+    await Promise.allSettled(batchPromises);
   };
 
   const processFile = async () => {
@@ -166,11 +195,18 @@ const BulkUpload = () => {
         throw new Error('No valid data found in CSV file');
       }
 
+      // Get headers for column mapping
+      const firstLine = text.split('\n')[0];
+      const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
+      
+      console.log('Detected headers:', headers);
+      console.log('Column mapping:', getColumnMapping(headers));
+
       const stats = { total: rows.length, processed: 0, errors: 0 };
       setUploadStats({ ...stats });
 
-      // Process in smaller batches to improve performance
-      const batchSize = 10;
+      // Process in smaller batches
+      const batchSize = 5;
       const totalBatches = Math.ceil(rows.length / batchSize);
 
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -183,7 +219,7 @@ const BulkUpload = () => {
         // Process each row in the batch
         for (let i = 0; i < batchRows.length; i++) {
           try {
-            const feedback = mapRowToFeedback(batchRows[i], startIndex + i);
+            const feedback = mapRowToFeedback(batchRows[i], headers, startIndex + i);
             feedbackBatch.push(feedback);
           } catch (error) {
             console.error(`Error processing row ${startIndex + i + 1}:`, error);
@@ -208,7 +244,7 @@ const BulkUpload = () => {
         setUploadStats({ ...stats });
 
         // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       toast({
@@ -261,7 +297,7 @@ const BulkUpload = () => {
           <span>Upload Feedback Data</span>
         </CardTitle>
         <CardDescription>
-          Select a CSV file containing customer feedback data. The system will automatically detect if column headers are present or use default column mapping.
+          Select a CSV file containing customer feedback data. The system will automatically detect column headers and map them appropriately.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -347,12 +383,15 @@ const BulkUpload = () => {
         <div className="bg-blue-50 p-4 rounded-lg">
           <h4 className="font-medium mb-2">Expected CSV Format:</h4>
           <div className="text-sm text-gray-600 space-y-1">
-            <Badge variant="outline" className="mr-2">Customer Name</Badge>
-            <Badge variant="outline" className="mr-2">Review Text</Badge>
+            <Badge variant="outline" className="mr-2">Customer Name (Required)</Badge>
+            <Badge variant="outline" className="mr-2">Review Text (Required)</Badge>
             <Badge variant="outline" className="mr-2">Rating</Badge>
             <Badge variant="outline" className="mr-2">Service Type</Badge>
             <p className="mt-2 text-xs">
               Optional: Customer ID, Phone, Email, Location, Bank Contact, Date
+            </p>
+            <p className="mt-2 text-xs font-medium">
+              Note: Column headers will be automatically detected and mapped
             </p>
           </div>
         </div>
