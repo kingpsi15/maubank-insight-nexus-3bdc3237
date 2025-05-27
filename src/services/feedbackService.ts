@@ -36,10 +36,11 @@ export const feedbackService = {
       throw error;
     }
 
-    // Cast service_type to ensure type safety
+    // Cast service_type and status to ensure type safety
     return (data || []).map(item => ({
       ...item,
-      service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+      service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+      status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
     }));
   },
 
@@ -54,10 +55,11 @@ export const feedbackService = {
         throw error;
       }
 
-      // Cast service_type to ensure type safety
+      // Cast service_type and status to ensure type safety
       return (data || []).map(item => ({
         ...item,
-        service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+        service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+        status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
       }));
     } catch (error) {
       console.error("Unexpected error fetching feedback:", error);
@@ -80,7 +82,8 @@ export const feedbackService = {
 
       return {
         ...data,
-        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
       };
     } catch (error) {
       console.error("Unexpected error creating feedback:", error);
@@ -104,7 +107,8 @@ export const feedbackService = {
 
       return {
         ...data,
-        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
       };
     } catch (error) {
       console.error("Unexpected error updating feedback:", error);
@@ -128,7 +132,8 @@ export const feedbackService = {
 
       return data ? {
         ...data,
-        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
       } : null;
     } catch (error) {
       console.error("Unexpected error updating feedback:", error);
