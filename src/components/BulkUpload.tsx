@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useFeedback } from '@/hooks/useFeedback';
+import CSVTemplate from '@/components/CSVTemplate';
 import type { Feedback } from '@/services/types';
 
 interface CSVRow {
@@ -57,7 +57,7 @@ const BulkUpload = () => {
     const lines = csvText.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    // Handle quoted CSV values properly
+    // Parse CSV line handling quotes properly
     const parseCSVLine = (line: string): string[] => {
       const result = [];
       let current = '';
@@ -80,17 +80,18 @@ const BulkUpload = () => {
       return result;
     };
 
-    // Parse headers (first line)
+    // Always treat first line as headers
     const headers = parseCSVLine(lines[0]);
-    console.log('Parsed headers:', headers);
+    console.log('CSV Headers detected:', headers);
     
     const rows: CSVRow[] = [];
 
-    // Parse data rows (starting from line 2, skipping headers)
+    // Parse data rows starting from line 2
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const row: CSVRow = {};
       
+      // Map each value to its corresponding header
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
       });
@@ -98,41 +99,75 @@ const BulkUpload = () => {
       rows.push(row);
     }
 
-    console.log('Parsed', rows.length, 'data rows from CSV');
+    console.log('Parsed', rows.length, 'data rows');
+    console.log('Sample row:', rows[0]);
     return { headers, rows };
   };
 
   const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
     try {
-      console.log('Processing row', rowIndex + 1, ':', row);
+      console.log(`Processing row ${rowIndex + 1}:`, row);
+      console.log('Available headers:', headers);
 
-      // Direct mapping based on your CSV structure
-      const customerName = row['Customer Name'] || row['Customer ID'] || '';
-      const reviewText = row['Review Text'] || '';
-      const rating = parseInt(row['Review Rating']) || 0;
-      const serviceType = row['Service Type'] || 'ATM';
+      // Flexible header mapping - check for exact matches first, then partial matches
+      const getFieldValue = (possibleNames: string[]): string => {
+        // First try exact matches
+        for (const name of possibleNames) {
+          if (row[name] !== undefined) {
+            return row[name] || '';
+          }
+        }
+        
+        // Then try case-insensitive partial matches
+        for (const name of possibleNames) {
+          const found = Object.keys(row).find(key => 
+            key.toLowerCase().includes(name.toLowerCase()) ||
+            name.toLowerCase().includes(key.toLowerCase())
+          );
+          if (found && row[found]) {
+            return row[found];
+          }
+        }
+        
+        return '';
+      };
+
+      // Map fields using flexible matching
+      const customerName = getFieldValue(['Customer Name', 'customer_name', 'name', 'Customer', 'customer']);
+      const reviewText = getFieldValue(['Review Text', 'review_text', 'review', 'feedback', 'comment', 'text']);
+      const ratingStr = getFieldValue(['Review Rating', 'review_rating', 'rating', 'score']);
+      const serviceType = getFieldValue(['Service Type', 'service_type', 'service', 'type']);
       
+      console.log('Mapped values:', {
+        customerName,
+        reviewText,
+        rating: ratingStr,
+        serviceType
+      });
+
       // Validate required fields
       if (!customerName || customerName.trim() === '') {
-        console.log('Missing customer name in row:', row);
+        console.error('Missing customer name in row:', row);
         throw new Error(`Customer name is required`);
       }
+      
       if (!reviewText || reviewText.trim() === '') {
         throw new Error(`Review text is required`);
       }
 
+      const rating = parseInt(ratingStr) || 0;
       const mappedServiceType = getServiceTypeMapping(serviceType);
 
       return {
         customer_name: customerName.trim(),
-        customer_id: row['Customer ID'] || null,
-        customer_phone: row['Customer Phone'] || null,
-        customer_email: row['Customer Email'] || null,
+        customer_id: getFieldValue(['Customer ID', 'customer_id', 'id']) || null,
+        customer_phone: getFieldValue(['Customer Phone', 'customer_phone', 'phone']) || null,
+        customer_email: getFieldValue(['Customer Email', 'customer_email', 'email']) || null,
         service_type: mappedServiceType,
         review_text: reviewText.trim(),
         review_rating: rating,
-        issue_location: row['Issue Location'] || null,
-        contacted_bank_person: row['Contacted Bank Person'] || null,
+        issue_location: getFieldValue(['Issue Location', 'issue_location', 'location']) || null,
+        contacted_bank_person: getFieldValue(['Contacted Bank Person', 'contacted_bank_person', 'bank_person', 'employee']) || null,
         status: 'new' as const,
         sentiment: 'neutral' as const,
         detected_issues: [],
@@ -257,10 +292,12 @@ const BulkUpload = () => {
           <span>Upload Feedback Data</span>
         </CardTitle>
         <CardDescription>
-          Select a CSV file containing customer feedback data. The system will automatically detect column headers and map them appropriately.
+          Select a CSV file containing customer feedback data. Download the template below if you need the correct format.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <CSVTemplate />
+        
         {!file ? (
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -365,7 +402,7 @@ const BulkUpload = () => {
               Optional: Customer ID, Customer Phone, Customer Email, Issue Location, Contacted Bank Person, Date
             </p>
             <p className="mt-2 text-xs font-medium">
-              Note: CSV files with headers are required. First row should contain column names.
+              Note: First row must contain column headers. Download the template above for the exact format.
             </p>
           </div>
         </div>
