@@ -29,24 +29,24 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   const { toast } = useToast();
 
   const downloadTemplate = () => {
-    // Create CSV template with all mandatory fields
+    // Create CSV template matching the actual format from the Excel file
     const headers = [
-      'CustomerId',
-      'CustomerName',
-      'CustomerPhone', 
-      'CustomerEmail',
-      'ServiceType',
-      'ReviewText',
-      'ReviewRating',
+      'Customer ID',
+      'Customer Name', 
+      'Customer Phone',
+      'Customer Email',
+      'Service Type',
+      'Review Text',
+      'Review Rating',
       'Date',
-      'IssueLocation',
-      'ContactedBankPerson'
+      'Issue Location',
+      'Contacted Bank Person'
     ];
     
     const sampleData = [
-      'CUST001,John Doe,+60-12-3456789,john@email.com,ATM,Great service and fast transaction,5,2024-01-15,Kuala Lumpur,Rajesh Kumar',
-      'CUST002,Jane Smith,+60-12-3456790,jane@email.com,OnlineBanking,Login issues and slow loading,2,2024-01-16,Selangor,Priya Sharma',
-      'CUST003,Ahmad bin Ali,+60-13-7890123,ahmad@email.com,CoreBanking,Account balance showing wrong amount,1,2024-01-17,Penang,Ahmad Rahman'
+      '15575025,Aarti Perni,+230 2878,xyz@gmail.com,Core Banking,State Maubank issue,4,########,Maubank,Mr. Gopal',
+      '70165007,Vikash Pillai,+230 2467,ab@gmail.com,Core Banking,I have my issue,5,########,Maubank,Ms. Dindoyal',
+      '64935944,Aarti Perni,+230 4422,xyz@gmail.com,ATM,I am using ATM,5,########,Maubank,Ms. Beeharry'
     ];
     
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -107,8 +107,8 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
       return 'Customer name is required';
     }
     
-    if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking'].includes(data.serviceType)) {
-      return 'Service type must be ATM, OnlineBanking, or CoreBanking';
+    if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking', 'Core Banking', 'Online Banking'].includes(data.serviceType)) {
+      return 'Service type must be ATM, OnlineBanking, CoreBanking, Core Banking, or Online Banking';
     }
     
     if (!data.reviewText || data.reviewText.trim() === '') {
@@ -116,8 +116,8 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     }
     
     const rating = parseInt(data.reviewRating);
-    if (isNaN(rating) || rating < 0 || rating > 5) {
-      return 'Review rating must be a number between 0 and 5';
+    if (isNaN(rating) || rating < 1 || rating > 5) {
+      return 'Review rating must be a number between 1 and 5';
     }
     
     if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
@@ -125,6 +125,16 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     }
     
     return null;
+  };
+
+  const normalizeServiceType = (serviceType: string): 'ATM' | 'OnlineBanking' | 'CoreBanking' => {
+    const normalized = serviceType.trim();
+    if (normalized === 'Core Banking') return 'CoreBanking';
+    if (normalized === 'Online Banking') return 'OnlineBanking';
+    if (normalized === 'ATM') return 'ATM';
+    if (normalized === 'CoreBanking') return 'CoreBanking';
+    if (normalized === 'OnlineBanking') return 'OnlineBanking';
+    return 'CoreBanking'; // default fallback
   };
 
   const processUpload = async () => {
@@ -142,10 +152,36 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
       }
 
       const headers = parseCSVLine(lines[0]).map(h => h.trim());
-      const expectedHeaders = ['CustomerId', 'CustomerName', 'CustomerPhone', 'CustomerEmail', 'ServiceType', 'ReviewText', 'ReviewRating', 'Date', 'IssueLocation', 'ContactedBankPerson'];
+      console.log('Headers found:', headers);
       
-      // Validate headers
-      const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+      // Map headers to expected format (handle both formats)
+      const headerMapping: { [key: string]: string } = {
+        'Customer ID': 'CustomerId',
+        'CustomerId': 'CustomerId',
+        'Customer Name': 'CustomerName',
+        'CustomerName': 'CustomerName',
+        'Customer Phone': 'CustomerPhone',
+        'CustomerPhone': 'CustomerPhone',
+        'Customer Email': 'CustomerEmail',
+        'CustomerEmail': 'CustomerEmail',
+        'Service Type': 'ServiceType',
+        'ServiceType': 'ServiceType',
+        'Review Text': 'ReviewText',
+        'ReviewText': 'ReviewText',
+        'Review Rating': 'ReviewRating',
+        'ReviewRating': 'ReviewRating',
+        'Date': 'Date',
+        'Issue Location': 'IssueLocation',
+        'IssueLocation': 'IssueLocation',
+        'Contacted Bank Person': 'ContactedBankPerson',
+        'ContactedBankPerson': 'ContactedBankPerson'
+      };
+
+      const normalizedHeaders = headers.map(h => headerMapping[h] || h);
+      const requiredHeaders = ['CustomerName', 'ServiceType', 'ReviewText', 'ReviewRating'];
+      
+      // Check for required headers
+      const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
       if (missingHeaders.length > 0) {
         throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
       }
@@ -170,7 +206,8 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
           const rowData: any = {};
           headers.forEach((header, index) => {
-            rowData[header] = values[index] || '';
+            const normalizedHeader = headerMapping[header] || header;
+            rowData[normalizedHeader] = values[index] || '';
           });
 
           // Convert to our format
@@ -179,9 +216,9 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             customer_name: rowData.CustomerName,
             customer_phone: rowData.CustomerPhone || null,
             customer_email: rowData.CustomerEmail || null,
-            service_type: rowData.ServiceType as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+            service_type: normalizeServiceType(rowData.ServiceType),
             review_text: rowData.ReviewText,
-            review_rating: parseInt(rowData.ReviewRating) || 0,
+            review_rating: parseInt(rowData.ReviewRating) || 1,
             issue_location: rowData.IssueLocation || null,
             contacted_bank_person: rowData.ContactedBankPerson || null,
             status: 'new' as const,
@@ -254,23 +291,23 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Download Template
           </CardTitle>
           <CardDescription>
-            Download the CSV template with the correct format and sample data. All columns are mandatory.
+            Download the CSV template with the correct format and sample data. Customer Name, Service Type, Review Text, and Review Rating (1-5) are mandatory.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-gray-600">
             <p className="font-semibold mb-2">Required columns:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>CustomerId - Unique customer identifier</li>
-              <li>CustomerName - Full name of the customer</li>
-              <li>CustomerPhone - Phone number with country code</li>
-              <li>CustomerEmail - Valid email address</li>
-              <li>ServiceType - ATM, OnlineBanking, or CoreBanking</li>
-              <li>ReviewText - Customer feedback text</li>
-              <li>ReviewRating - Rating from 0 to 5 (0 means no rating)</li>
-              <li>Date - Feedback date (YYYY-MM-DD format)</li>
-              <li>IssueLocation - Location where issue occurred</li>
-              <li>ContactedBankPerson - Name of bank employee contacted</li>
+              <li>Customer ID - Unique customer identifier (optional)</li>
+              <li>Customer Name - Full name of the customer (required)</li>
+              <li>Customer Phone - Phone number with country code (optional)</li>
+              <li>Customer Email - Valid email address (optional)</li>
+              <li>Service Type - ATM, OnlineBanking, CoreBanking, Core Banking, or Online Banking (required)</li>
+              <li>Review Text - Customer feedback text (required)</li>
+              <li>Review Rating - Rating from 1 to 5 (required)</li>
+              <li>Date - Feedback date (YYYY-MM-DD format) (optional)</li>
+              <li>Issue Location - Location where issue occurred (optional)</li>
+              <li>Contacted Bank Person - Name of bank employee contacted (optional)</li>
             </ul>
           </div>
           <Button onClick={downloadTemplate} variant="outline" className="flex items-center">
@@ -288,7 +325,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Upload Feedback Data
           </CardTitle>
           <CardDescription>
-            Select a CSV file containing customer feedback data with all mandatory columns
+            Select a CSV file containing customer feedback data. The system accepts both formats: "Customer Name" and "CustomerName".
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
