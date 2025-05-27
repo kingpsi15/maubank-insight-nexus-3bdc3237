@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,141 +28,6 @@ const BulkUpload = () => {
   const { toast } = useToast();
   const { createFeedback } = useFeedback();
 
-  // Improved column mapping with position-based fallback
-  const getColumnMapping = (headers: string[], sampleRow?: string[]) => {
-    const mapping: { [key: string]: string } = {};
-    
-    console.log('Processing headers:', headers);
-    console.log('Sample row for reference:', sampleRow);
-    
-    // If we have a sample row, check if the first row might actually be data instead of headers
-    const firstRowLooksLikeData = sampleRow && (
-      !isNaN(Number(sampleRow[0])) || // First column is a number (rating)
-      sampleRow.some(cell => cell.includes('@')) || // Has email
-      sampleRow.some(cell => cell.includes('+')) || // Has phone
-      sampleRow.some(cell => cell.length > 50) // Has long text (review)
-    );
-
-    if (firstRowLooksLikeData) {
-      console.log('First row appears to be data, not headers. Using position-based mapping.');
-      // Use position-based mapping when headers are actually data
-      return {
-        '0': 'review_rating',
-        '1': 'customer_id', 
-        '2': 'customer_name',
-        '3': 'customer_phone',
-        '4': 'customer_email',
-        '5': 'service_type',
-        '6': 'review_text',
-        '7': 'created_at',
-        '8': 'issue_location',
-        '9': 'contacted_bank_person'
-      };
-    }
-    
-    headers.forEach((header, index) => {
-      const trimmedHeader = header.trim();
-      console.log('Processing header:', trimmedHeader);
-      
-      // Exact matches first
-      if (trimmedHeader === 'Customer Name') {
-        mapping[header] = 'customer_name';
-      }
-      else if (trimmedHeader === 'Customer ID') {
-        mapping[header] = 'customer_id';
-      }
-      else if (trimmedHeader === 'Customer Phone') {
-        mapping[header] = 'customer_phone';
-      }
-      else if (trimmedHeader === 'Customer Email') {
-        mapping[header] = 'customer_email';
-      }
-      else if (trimmedHeader === 'Service Type') {
-        mapping[header] = 'service_type';
-      }
-      else if (trimmedHeader === 'Review Text') {
-        mapping[header] = 'review_text';
-      }
-      else if (trimmedHeader === 'Review Rating') {
-        mapping[header] = 'review_rating';
-      }
-      else if (trimmedHeader === 'Issue Location') {
-        mapping[header] = 'issue_location';
-      }
-      else if (trimmedHeader === 'Contacted Bank Person') {
-        mapping[header] = 'contacted_bank_person';
-      }
-      else if (trimmedHeader === 'Date') {
-        mapping[header] = 'created_at';
-      }
-      // Fallback to normalized matching for flexibility
-      else {
-        const normalizedHeader = header.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-        
-        if (normalizedHeader.includes('customername') || 
-            normalizedHeader.includes('custname') ||
-            normalizedHeader === 'name' ||
-            normalizedHeader === 'customer') {
-          mapping[header] = 'customer_name';
-        }
-        else if (normalizedHeader.includes('customerid') || 
-                 normalizedHeader.includes('custid') ||
-                 normalizedHeader === 'id') {
-          mapping[header] = 'customer_id';
-        }
-        else if (normalizedHeader.includes('phone') || 
-                 normalizedHeader.includes('mobile') || 
-                 normalizedHeader.includes('contact') ||
-                 normalizedHeader.includes('tel')) {
-          mapping[header] = 'customer_phone';
-        }
-        else if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
-          mapping[header] = 'customer_email';
-        }
-        else if (normalizedHeader.includes('service') || 
-                 normalizedHeader.includes('servicety') ||
-                 normalizedHeader === 'service' ||
-                 normalizedHeader.includes('product')) {
-          mapping[header] = 'service_type';
-        }
-        else if (normalizedHeader.includes('review') || 
-                 normalizedHeader.includes('feedback') ||
-                 normalizedHeader.includes('comment') ||
-                 normalizedHeader.includes('description') ||
-                 normalizedHeader.includes('text')) {
-          mapping[header] = 'review_text';
-        }
-        else if (normalizedHeader.includes('rating') || 
-                 normalizedHeader.includes('reviewra') ||
-                 normalizedHeader === 'score' ||
-                 normalizedHeader.includes('rate')) {
-          mapping[header] = 'review_rating';
-        }
-        else if (normalizedHeader.includes('location') || 
-                 normalizedHeader.includes('issueloca') ||
-                 normalizedHeader.includes('branch') ||
-                 normalizedHeader.includes('place')) {
-          mapping[header] = 'issue_location';
-        }
-        else if (normalizedHeader.includes('bank') || 
-                 normalizedHeader.includes('contacted') ||
-                 normalizedHeader.includes('employee') ||
-                 normalizedHeader.includes('staff') ||
-                 normalizedHeader.includes('person')) {
-          mapping[header] = 'contacted_bank_person';
-        }
-        else if (normalizedHeader.includes('date') || 
-                 normalizedHeader.includes('created') ||
-                 normalizedHeader.includes('time')) {
-          mapping[header] = 'created_at';
-        }
-      }
-    });
-    
-    console.log('Final column mapping:', mapping);
-    return mapping;
-  };
-
   const getServiceTypeMapping = (serviceType: string): 'ATM' | 'OnlineBanking' | 'CoreBanking' => {
     if (!serviceType) return 'ATM';
     
@@ -187,9 +53,9 @@ const BulkUpload = () => {
     return 'ATM';
   };
 
-  const parseCSV = (csvText: string): { headers: string[], rows: CSVRow[], hasHeaders: boolean } => {
+  const parseCSV = (csvText: string): { headers: string[], rows: CSVRow[] } => {
     const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return { headers: [], rows: [], hasHeaders: false };
+    if (lines.length === 0) return { headers: [], rows: [] };
 
     // Handle quoted CSV values properly
     const parseCSVLine = (line: string): string[] => {
@@ -214,47 +80,14 @@ const BulkUpload = () => {
       return result;
     };
 
-    const firstLineValues = parseCSVLine(lines[0]);
-    const secondLineValues = lines.length > 1 ? parseCSVLine(lines[1]) : null;
-    
-    console.log('First line values:', firstLineValues);
-    console.log('Second line values:', secondLineValues);
-    
-    // Check if first line looks like headers or data
-    const firstLineLooksLikeHeaders = firstLineValues.some(val => 
-      val.toLowerCase().includes('name') || 
-      val.toLowerCase().includes('email') || 
-      val.toLowerCase().includes('phone') ||
-      val.toLowerCase().includes('service') ||
-      val.toLowerCase().includes('review') ||
-      val.toLowerCase().includes('rating')
-    );
-    
-    const firstLineLooksLikeData = !isNaN(Number(firstLineValues[0])) || 
-                                   firstLineValues.some(val => val.includes('@')) ||
-                                   firstLineValues.some(val => val.includes('+')) ||
-                                   firstLineValues.some(val => val.length > 50);
-
-    let headers: string[];
-    let dataStartIndex: number;
-    let hasHeaders: boolean;
-
-    if (firstLineLooksLikeHeaders && !firstLineLooksLikeData) {
-      headers = firstLineValues;
-      dataStartIndex = 1;
-      hasHeaders = true;
-      console.log('Using first line as headers:', headers);
-    } else {
-      // Generate position-based headers
-      headers = firstLineValues.map((_, index) => index.toString());
-      dataStartIndex = 0;
-      hasHeaders = false;
-      console.log('Generated position-based headers:', headers);
-    }
+    // Parse headers (first line)
+    const headers = parseCSVLine(lines[0]);
+    console.log('Parsed headers:', headers);
     
     const rows: CSVRow[] = [];
 
-    for (let i = dataStartIndex; i < lines.length; i++) {
+    // Parse data rows (starting from line 2, skipping headers)
+    for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const row: CSVRow = {};
       
@@ -265,54 +98,47 @@ const BulkUpload = () => {
       rows.push(row);
     }
 
-    console.log('Parsed', rows.length, 'rows from CSV');
-    return { headers, rows, hasHeaders };
+    console.log('Parsed', rows.length, 'data rows from CSV');
+    return { headers, rows };
   };
 
-  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number, hasHeaders: boolean): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
+  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
     try {
-      const sampleRow = hasHeaders ? null : Object.values(row);
-      const columnMapping = getColumnMapping(headers, sampleRow);
-      const mappedRow: any = {};
+      console.log('Processing row', rowIndex + 1, ':', row);
+
+      // Direct mapping based on your CSV structure
+      const customerName = row['Customer Name'] || row['Customer ID'] || '';
+      const reviewText = row['Review Text'] || '';
+      const rating = parseInt(row['Review Rating']) || 0;
+      const serviceType = row['Service Type'] || 'ATM';
       
-      // Map columns using the dynamic mapping
-      Object.entries(row).forEach(([csvColumn, value]) => {
-        if (columnMapping[csvColumn]) {
-          mappedRow[columnMapping[csvColumn]] = value;
-        }
-      });
-
-      console.log('Row', rowIndex + 1, 'mapped data:', mappedRow);
-
-      // Ensure required fields with better error messages
-      if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
-        console.log('Available columns:', Object.keys(row));
-        console.log('Column mapping:', columnMapping);
-        console.log('Raw row data:', Object.values(row));
-        throw new Error(`Customer name missing - available columns: ${Object.keys(row).join(', ')}`);
+      // Validate required fields
+      if (!customerName || customerName.trim() === '') {
+        console.log('Missing customer name in row:', row);
+        throw new Error(`Customer name is required`);
       }
-      if (!mappedRow.review_text || mappedRow.review_text.trim() === '') {
-        throw new Error(`Review text missing`);
+      if (!reviewText || reviewText.trim() === '') {
+        throw new Error(`Review text is required`);
       }
 
-      const serviceType = getServiceTypeMapping(mappedRow.service_type);
-      const rating = parseInt(mappedRow.review_rating) || 0;
+      const mappedServiceType = getServiceTypeMapping(serviceType);
 
       return {
-        customer_name: mappedRow.customer_name.trim(),
-        customer_id: mappedRow.customer_id || null,
-        customer_phone: mappedRow.customer_phone || null,
-        customer_email: mappedRow.customer_email || null,
-        service_type: serviceType,
-        review_text: mappedRow.review_text.trim(),
+        customer_name: customerName.trim(),
+        customer_id: row['Customer ID'] || null,
+        customer_phone: row['Customer Phone'] || null,
+        customer_email: row['Customer Email'] || null,
+        service_type: mappedServiceType,
+        review_text: reviewText.trim(),
         review_rating: rating,
-        issue_location: mappedRow.issue_location || null,
-        contacted_bank_person: mappedRow.contacted_bank_person || null,
+        issue_location: row['Issue Location'] || null,
+        contacted_bank_person: row['Contacted Bank Person'] || null,
         status: 'new' as const,
         sentiment: 'neutral' as const,
         detected_issues: [],
       };
     } catch (error) {
+      console.error('Error processing row:', error, 'Row data:', row);
       throw new Error(`Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Invalid data'}`);
     }
   };
@@ -327,47 +153,56 @@ const BulkUpload = () => {
 
     try {
       const text = await file.text();
-      const { headers, rows, hasHeaders } = parseCSV(text);
+      const { headers, rows } = parseCSV(text);
       
       if (rows.length === 0) {
         throw new Error('No valid data found in CSV file');
       }
 
       console.log('Starting processing with headers:', headers);
-      console.log('Has headers:', hasHeaders);
+      console.log('Sample row:', rows[0]);
 
       const stats = { total: rows.length, processed: 0, errors: 0 };
       const errors: string[] = [];
       setUploadStats({ ...stats });
 
-      // Process rows sequentially
-      for (let i = 0; i < rows.length; i++) {
-        try {
-          const feedback = mapRowToFeedback(rows[i], headers, i, hasHeaders);
-          
-          await new Promise<void>((resolve, reject) => {
+      // Process rows in batches for better performance
+      const batchSize = 10;
+      for (let i = 0; i < rows.length; i += batchSize) {
+        const batch = rows.slice(i, i + batchSize);
+        
+        await Promise.allSettled(
+          batch.map(async (row, batchIndex) => {
+            const rowIndex = i + batchIndex;
             try {
-              createFeedback(feedback);
-              setTimeout(() => resolve(), 50);
+              const feedback = mapRowToFeedback(row, headers, rowIndex);
+              await new Promise<void>((resolve, reject) => {
+                try {
+                  createFeedback(feedback);
+                  setTimeout(() => resolve(), 10); // Small delay to prevent overwhelming
+                } catch (error) {
+                  reject(error);
+                }
+              });
+              
+              stats.processed++;
             } catch (error) {
-              reject(error);
+              const errorMsg = `Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
+              console.error('Processing error:', errorMsg);
+              errors.push(errorMsg);
+              stats.errors++;
             }
-          });
-          
-          stats.processed++;
-        } catch (error) {
-          const errorMsg = `Row ${i + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
-          console.error('Processing error:', errorMsg);
-          errors.push(errorMsg);
-          stats.errors++;
-        }
+          })
+        );
 
-        if (i % 10 === 0 || i === rows.length - 1) {
-          const progressPercent = Math.round(((i + 1) / rows.length) * 100);
-          setProgress(progressPercent);
-          setUploadStats({ ...stats });
-          setErrorDetails([...errors]);
-        }
+        // Update progress every batch
+        const progressPercent = Math.round(((i + batch.length) / rows.length) * 100);
+        setProgress(progressPercent);
+        setUploadStats({ ...stats });
+        setErrorDetails([...errors.slice(0, 20)]); // Show only first 20 errors
+        
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
       toast({
@@ -530,7 +365,7 @@ const BulkUpload = () => {
               Optional: Customer ID, Customer Phone, Customer Email, Issue Location, Contacted Bank Person, Date
             </p>
             <p className="mt-2 text-xs font-medium">
-              Note: CSV files with or without headers are supported. The system will auto-detect the format.
+              Note: CSV files with headers are required. First row should contain column names.
             </p>
           </div>
         </div>
