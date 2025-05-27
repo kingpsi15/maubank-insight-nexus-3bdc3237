@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useFeedback } from '@/hooks/useFeedback';
+import type { Feedback } from '@/services/types';
 
 interface CSVRow {
   [key: string]: string;
@@ -108,17 +108,31 @@ const BulkUpload = () => {
     return mapping;
   };
 
-  const getServiceTypeMapping = (serviceType: string): string => {
+  const getServiceTypeMapping = (serviceType: string): 'ATM' | 'OnlineBanking' | 'CoreBanking' => {
     if (!serviceType) return 'ATM';
     
     const normalizedService = serviceType.toLowerCase().trim();
+    console.log('Mapping service type:', serviceType, 'normalized:', normalizedService);
     
-    // Handle partial matches for truncated service types
-    if (normalizedService.includes('atm')) return 'ATM';
-    if (normalizedService.includes('online') || normalizedService.includes('internet') || normalizedService.includes('mobile')) return 'OnlineBanking';
-    if (normalizedService.includes('core') || normalizedService.includes('branch') || normalizedService.includes('counter')) return 'CoreBanking';
+    // Handle specific cases from the CSV
+    if (normalizedService.includes('core') || 
+        normalizedService.includes('operations') ||
+        normalizedService.includes('branch') || 
+        normalizedService.includes('counter')) {
+      return 'CoreBanking';
+    }
+    if (normalizedService.includes('atm')) {
+      return 'ATM';
+    }
+    if (normalizedService.includes('online') || 
+        normalizedService.includes('internet') || 
+        normalizedService.includes('mobile') ||
+        normalizedService.includes('digital')) {
+      return 'OnlineBanking';
+    }
     
-    return 'ATM'; // Default fallback
+    // Default fallback
+    return 'ATM';
   };
 
   const parseCSV = (csvText: string): CSVRow[] => {
@@ -145,7 +159,7 @@ const BulkUpload = () => {
     return rows;
   };
 
-  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number) => {
+  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
     try {
       const columnMapping = getColumnMapping(headers);
       const mappedRow: any = {};
@@ -157,6 +171,8 @@ const BulkUpload = () => {
         }
       });
 
+      console.log('Row', rowIndex + 1, 'mapped data:', mappedRow);
+
       // Ensure required fields
       if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
         throw new Error(`Customer name missing in row ${rowIndex + 1}`);
@@ -166,20 +182,22 @@ const BulkUpload = () => {
       }
 
       // Process and validate data
+      const serviceType = getServiceTypeMapping(mappedRow.service_type);
+      const rating = parseInt(mappedRow.review_rating) || 0;
+
       return {
         customer_name: mappedRow.customer_name.trim(),
         customer_id: mappedRow.customer_id || null,
         customer_phone: mappedRow.customer_phone || null,
         customer_email: mappedRow.customer_email || null,
-        service_type: getServiceTypeMapping(mappedRow.service_type),
+        service_type: serviceType,
         review_text: mappedRow.review_text.trim(),
-        review_rating: parseInt(mappedRow.review_rating) || 0,
+        review_rating: rating,
         issue_location: mappedRow.issue_location || null,
         contacted_bank_person: mappedRow.contacted_bank_person || null,
         status: 'new' as const,
         sentiment: 'neutral' as const,
         detected_issues: [],
-        created_at: mappedRow.created_at ? new Date(mappedRow.created_at).toISOString() : new Date().toISOString()
       };
     } catch (error) {
       throw new Error(`Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Invalid data'}`);
@@ -211,54 +229,36 @@ const BulkUpload = () => {
       const errors: string[] = [];
       setUploadStats({ ...stats });
 
-      // Process in larger batches for better performance
-      const batchSize = 10;
-      const totalBatches = Math.ceil(rows.length / batchSize);
+      // Process rows sequentially to avoid overwhelming the system
+      for (let i = 0; i < rows.length; i++) {
+        try {
+          const feedback = mapRowToFeedback(rows[i], headers, i);
+          
+          // Wrap createFeedback in a Promise since it returns void
+          await new Promise<void>((resolve, reject) => {
+            try {
+              createFeedback(feedback);
+              setTimeout(() => resolve(), 100); // Small delay to prevent overwhelming
+            } catch (error) {
+              reject(error);
+            }
+          });
+          
+          stats.processed++;
+        } catch (error) {
+          const errorMsg = `Row ${i + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
+          console.error('Processing error:', errorMsg);
+          errors.push(errorMsg);
+          stats.errors++;
+        }
 
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-        const startIndex = batchIndex * batchSize;
-        const endIndex = Math.min(startIndex + batchSize, rows.length);
-        const batchRows = rows.slice(startIndex, endIndex);
-        
-        // Process batch in parallel for better performance
-        const batchPromises = batchRows.map(async (row, i) => {
-          try {
-            const feedback = mapRowToFeedback(row, headers, startIndex + i);
-            
-            // Create feedback using mutation
-            return new Promise<void>((resolve, reject) => {
-              try {
-                createFeedback(feedback);
-                setTimeout(() => resolve(), 50); // Reduced delay
-              } catch (error) {
-                reject(error);
-              }
-            });
-          } catch (error) {
-            const errorMsg = `Row ${startIndex + i + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
-            errors.push(errorMsg);
-            stats.errors++;
-            throw error;
-          }
-        });
-
-        // Wait for batch to complete
-        const results = await Promise.allSettled(batchPromises);
-        
-        // Count successful operations
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        stats.processed += successful;
-
-        // Update progress
-        const progressPercent = Math.round(((batchIndex + 1) / totalBatches) * 100);
-        setProgress(progressPercent);
-        setUploadStats({ ...stats });
-        setErrorDetails([...errors]);
-
-        console.log(`Batch ${batchIndex + 1}/${totalBatches} complete. Successful: ${successful}, Errors: ${batchRows.length - successful}`);
-
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Update progress every 10 rows or at the end
+        if (i % 10 === 0 || i === rows.length - 1) {
+          const progressPercent = Math.round(((i + 1) / rows.length) * 100);
+          setProgress(progressPercent);
+          setUploadStats({ ...stats });
+          setErrorDetails([...errors]);
+        }
       }
 
       toast({
