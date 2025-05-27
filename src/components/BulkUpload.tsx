@@ -27,80 +27,106 @@ const BulkUpload = () => {
   const { toast } = useToast();
   const { createFeedback } = useFeedback();
 
-  // Improved column mapping with more flexible matching
+  // Improved column mapping with exact header matching
   const getColumnMapping = (headers: string[]) => {
     const mapping: { [key: string]: string } = {};
     
     headers.forEach(header => {
-      const normalizedHeader = header.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-      console.log('Processing header:', header, 'normalized:', normalizedHeader);
+      const trimmedHeader = header.trim();
+      console.log('Processing header:', trimmedHeader);
       
-      // Customer Name - more flexible
-      if (normalizedHeader.includes('customername') || 
-          normalizedHeader.includes('custname') ||
-          normalizedHeader === 'name' ||
-          normalizedHeader === 'customer') {
+      // Exact matches first
+      if (trimmedHeader === 'Customer Name') {
         mapping[header] = 'customer_name';
       }
-      // Customer ID
-      else if (normalizedHeader.includes('customerid') || 
-               normalizedHeader.includes('custid') ||
-               normalizedHeader === 'id') {
+      else if (trimmedHeader === 'Customer ID') {
         mapping[header] = 'customer_id';
       }
-      // Phone - handle variations
-      else if (normalizedHeader.includes('phone') || 
-               normalizedHeader.includes('mobile') || 
-               normalizedHeader.includes('contact') ||
-               normalizedHeader.includes('tel')) {
+      else if (trimmedHeader === 'Customer Phone') {
         mapping[header] = 'customer_phone';
       }
-      // Email
-      else if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
+      else if (trimmedHeader === 'Customer Email') {
         mapping[header] = 'customer_email';
       }
-      // Service Type - handle truncated headers like "Service Ty"
-      else if (normalizedHeader.includes('service') || 
-               normalizedHeader.includes('servicety') ||
-               normalizedHeader === 'service' ||
-               normalizedHeader.includes('product')) {
+      else if (trimmedHeader === 'Service Type') {
         mapping[header] = 'service_type';
       }
-      // Review Text - very flexible
-      else if (normalizedHeader.includes('review') || 
-               normalizedHeader.includes('feedback') ||
-               normalizedHeader.includes('comment') ||
-               normalizedHeader.includes('description') ||
-               normalizedHeader.includes('text')) {
+      else if (trimmedHeader === 'Review Text') {
         mapping[header] = 'review_text';
       }
-      // Rating - handle "Review Ra" truncated header
-      else if (normalizedHeader.includes('rating') || 
-               normalizedHeader.includes('reviewra') ||
-               normalizedHeader === 'score' ||
-               normalizedHeader.includes('rate')) {
+      else if (trimmedHeader === 'Review Rating') {
         mapping[header] = 'review_rating';
       }
-      // Location - handle "Issue Loca" truncated header
-      else if (normalizedHeader.includes('location') || 
-               normalizedHeader.includes('issueloca') ||
-               normalizedHeader.includes('branch') ||
-               normalizedHeader.includes('place')) {
+      else if (trimmedHeader === 'Issue Location') {
         mapping[header] = 'issue_location';
       }
-      // Bank Contact
-      else if (normalizedHeader.includes('bank') || 
-               normalizedHeader.includes('contacted') ||
-               normalizedHeader.includes('employee') ||
-               normalizedHeader.includes('staff') ||
-               normalizedHeader.includes('person')) {
+      else if (trimmedHeader === 'Contacted Bank Person') {
         mapping[header] = 'contacted_bank_person';
       }
-      // Date
-      else if (normalizedHeader.includes('date') || 
-               normalizedHeader.includes('created') ||
-               normalizedHeader.includes('time')) {
+      else if (trimmedHeader === 'Date') {
         mapping[header] = 'created_at';
+      }
+      // Fallback to normalized matching for flexibility
+      else {
+        const normalizedHeader = header.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+        
+        if (normalizedHeader.includes('customername') || 
+            normalizedHeader.includes('custname') ||
+            normalizedHeader === 'name' ||
+            normalizedHeader === 'customer') {
+          mapping[header] = 'customer_name';
+        }
+        else if (normalizedHeader.includes('customerid') || 
+                 normalizedHeader.includes('custid') ||
+                 normalizedHeader === 'id') {
+          mapping[header] = 'customer_id';
+        }
+        else if (normalizedHeader.includes('phone') || 
+                 normalizedHeader.includes('mobile') || 
+                 normalizedHeader.includes('contact') ||
+                 normalizedHeader.includes('tel')) {
+          mapping[header] = 'customer_phone';
+        }
+        else if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
+          mapping[header] = 'customer_email';
+        }
+        else if (normalizedHeader.includes('service') || 
+                 normalizedHeader.includes('servicety') ||
+                 normalizedHeader === 'service' ||
+                 normalizedHeader.includes('product')) {
+          mapping[header] = 'service_type';
+        }
+        else if (normalizedHeader.includes('review') || 
+                 normalizedHeader.includes('feedback') ||
+                 normalizedHeader.includes('comment') ||
+                 normalizedHeader.includes('description') ||
+                 normalizedHeader.includes('text')) {
+          mapping[header] = 'review_text';
+        }
+        else if (normalizedHeader.includes('rating') || 
+                 normalizedHeader.includes('reviewra') ||
+                 normalizedHeader === 'score' ||
+                 normalizedHeader.includes('rate')) {
+          mapping[header] = 'review_rating';
+        }
+        else if (normalizedHeader.includes('location') || 
+                 normalizedHeader.includes('issueloca') ||
+                 normalizedHeader.includes('branch') ||
+                 normalizedHeader.includes('place')) {
+          mapping[header] = 'issue_location';
+        }
+        else if (normalizedHeader.includes('bank') || 
+                 normalizedHeader.includes('contacted') ||
+                 normalizedHeader.includes('employee') ||
+                 normalizedHeader.includes('staff') ||
+                 normalizedHeader.includes('person')) {
+          mapping[header] = 'contacted_bank_person';
+        }
+        else if (normalizedHeader.includes('date') || 
+                 normalizedHeader.includes('created') ||
+                 normalizedHeader.includes('time')) {
+          mapping[header] = 'created_at';
+        }
       }
     });
     
@@ -114,7 +140,6 @@ const BulkUpload = () => {
     const normalizedService = serviceType.toLowerCase().trim();
     console.log('Mapping service type:', serviceType, 'normalized:', normalizedService);
     
-    // Handle specific cases from the CSV
     if (normalizedService.includes('core') || 
         normalizedService.includes('operations') ||
         normalizedService.includes('branch') || 
@@ -131,7 +156,6 @@ const BulkUpload = () => {
       return 'OnlineBanking';
     }
     
-    // Default fallback
     return 'ATM';
   };
 
@@ -139,13 +163,36 @@ const BulkUpload = () => {
     const lines = csvText.split('\n').filter(line => line.trim());
     if (lines.length === 0) return [];
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    // Handle quoted CSV values properly
+    const parseCSVLine = (line: string): string[] => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseCSVLine(lines[0]);
     console.log('CSV Headers detected:', headers);
     
     const rows: CSVRow[] = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const values = parseCSVLine(lines[i]);
       const row: CSVRow = {};
       
       headers.forEach((header, index) => {
@@ -173,15 +220,16 @@ const BulkUpload = () => {
 
       console.log('Row', rowIndex + 1, 'mapped data:', mappedRow);
 
-      // Ensure required fields
+      // Ensure required fields with better error messages
       if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
-        throw new Error(`Customer name missing in row ${rowIndex + 1}`);
+        console.log('Available columns:', Object.keys(row));
+        console.log('Column mapping:', columnMapping);
+        throw new Error(`Customer name missing - available columns: ${Object.keys(row).join(', ')}`);
       }
       if (!mappedRow.review_text || mappedRow.review_text.trim() === '') {
-        throw new Error(`Review text missing in row ${rowIndex + 1}`);
+        throw new Error(`Review text missing`);
       }
 
-      // Process and validate data
       const serviceType = getServiceTypeMapping(mappedRow.service_type);
       const rating = parseInt(mappedRow.review_rating) || 0;
 
@@ -221,24 +269,44 @@ const BulkUpload = () => {
       }
 
       const firstLine = text.split('\n')[0];
-      const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
+      const parseCSVLine = (line: string): string[] => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        
+        result.push(current.trim());
+        return result;
+      };
       
+      const headers = parseCSVLine(firstLine);
       console.log('Starting processing with headers:', headers);
 
       const stats = { total: rows.length, processed: 0, errors: 0 };
       const errors: string[] = [];
       setUploadStats({ ...stats });
 
-      // Process rows sequentially to avoid overwhelming the system
+      // Process rows sequentially
       for (let i = 0; i < rows.length; i++) {
         try {
           const feedback = mapRowToFeedback(rows[i], headers, i);
           
-          // Wrap createFeedback in a Promise since it returns void
           await new Promise<void>((resolve, reject) => {
             try {
               createFeedback(feedback);
-              setTimeout(() => resolve(), 100); // Small delay to prevent overwhelming
+              setTimeout(() => resolve(), 50);
             } catch (error) {
               reject(error);
             }
@@ -252,7 +320,6 @@ const BulkUpload = () => {
           stats.errors++;
         }
 
-        // Update progress every 10 rows or at the end
         if (i % 10 === 0 || i === rows.length - 1) {
           const progressPercent = Math.round(((i + 1) / rows.length) * 100);
           setProgress(progressPercent);
@@ -415,13 +482,13 @@ const BulkUpload = () => {
           <div className="text-sm text-gray-600 space-y-1">
             <Badge variant="outline" className="mr-2">Customer Name (Required)</Badge>
             <Badge variant="outline" className="mr-2">Review Text (Required)</Badge>
-            <Badge variant="outline" className="mr-2">Rating</Badge>
+            <Badge variant="outline" className="mr-2">Review Rating</Badge>
             <Badge variant="outline" className="mr-2">Service Type</Badge>
             <p className="mt-2 text-xs">
-              Optional: Customer ID, Phone, Email, Location, Bank Contact, Date
+              Optional: Customer ID, Customer Phone, Customer Email, Issue Location, Contacted Bank Person, Date
             </p>
             <p className="mt-2 text-xs font-medium">
-              Note: Column headers will be automatically detected and mapped (supports truncated headers)
+              Note: Column headers will be automatically detected and mapped
             </p>
           </div>
         </div>
