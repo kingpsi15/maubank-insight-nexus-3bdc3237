@@ -6,7 +6,7 @@ import { Issue } from './types';
 export const issueService = {
   async getAll(status?: string) {
     if (isDemoMode) {
-      console.log('Demo mode: returning mock issues');
+      console.log('Demo mode: Supabase not connected. Please connect to Supabase to view issues.');
       return [];
     }
 
@@ -21,13 +21,13 @@ export const issueService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async create(issue: Omit<Issue, 'id' | 'created_at' | 'updated_at'>) {
     if (isDemoMode) {
       console.log('Demo mode: would create issue', issue);
-      return { ...issue, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      throw new Error('Supabase not connected. Please connect to Supabase to create issues.');
     }
 
     const { data, error } = await supabase
@@ -43,7 +43,7 @@ export const issueService = {
   async update(id: string, updates: Partial<Issue>) {
     if (isDemoMode) {
       console.log('Demo mode: would update issue', id, updates);
-      return updates;
+      throw new Error('Supabase not connected. Please connect to Supabase to update issues.');
     }
 
     const { data, error } = await supabase
@@ -60,7 +60,7 @@ export const issueService = {
   async approve(id: string, approvedBy: string, resolution?: string) {
     if (isDemoMode) {
       console.log('Demo mode: would approve issue', id);
-      return {};
+      throw new Error('Supabase not connected. Please connect to Supabase to approve issues.');
     }
 
     const updates: Partial<Issue> = {
@@ -88,7 +88,7 @@ export const issueService = {
   async reject(id: string) {
     if (isDemoMode) {
       console.log('Demo mode: would reject issue', id);
-      return {};
+      throw new Error('Supabase not connected. Please connect to Supabase to reject issues.');
     }
 
     const { data, error } = await supabase

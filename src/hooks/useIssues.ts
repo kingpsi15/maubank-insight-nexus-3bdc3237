@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { issueService, Issue } from '@/services/database';
+import { issueService, Issue } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 
 export const useIssues = (status?: string) => {

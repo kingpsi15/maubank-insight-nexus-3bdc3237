@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Edit, Calendar, Star, MapPin, User } from 'lucide-react';
+import { useFeedback } from '@/hooks/useFeedback';
 
 interface FeedbackTableProps {
   searchTerm: string;
@@ -14,95 +16,11 @@ interface FeedbackTableProps {
 
 const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTableProps) => {
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
-
-  // Mock feedback data based on Mau Bank Malaysia
-  const feedbackData = [
-    {
-      id: 'F001',
-      date: '2025-05-25',
-      customerName: 'Ahmad Rahman',
-      customerPhone: '+60-12-3456789',
-      customerEmail: 'ahmad.rahman@email.com',
-      serviceType: 'ATM',
-      reviewText: 'ATM di cawangan Kuala Lumpur sangat perlahan dan kad saya tersekat. Terpaksa menunggu 30 minit untuk bantuan.',
-      reviewRating: 2,
-      issueLocation: 'Kuala Lumpur',
-      contactedBankPerson: 'Siti Aminah',
-      status: 'in_progress',
-      detectedIssues: ['ATM card stuck', 'Slow transaction'],
-      sentiment: 'negative'
-    },
-    {
-      id: 'F002',
-      date: '2025-05-24',
-      customerName: 'Sarah Lim',
-      customerPhone: '+60-16-7891234',
-      customerEmail: 'sarah.lim@email.com',
-      serviceType: 'OnlineBanking',
-      reviewText: 'Sistem perbankan dalam talian sangat bagus! Mudah digunakan dan selamat. Suka dengan kemaskini aplikasi mudah alih yang baru.',
-      reviewRating: 5,
-      issueLocation: 'Selangor',
-      contactedBankPerson: 'Lee Wei Ming',
-      status: 'resolved',
-      detectedIssues: ['Positive feedback'],
-      sentiment: 'positive'
-    },
-    {
-      id: 'F003',
-      date: '2025-05-23',
-      customerName: 'Raj Kumar',
-      customerPhone: '+60-19-2345678',
-      customerEmail: 'raj.kumar@email.com',
-      serviceType: 'CoreBanking',
-      reviewText: 'Pemindahan wang tertangguh selama 3 hari. Pengalaman yang sangat mengecewakan dengan perkhidmatan pelanggan.',
-      reviewRating: 1,
-      issueLocation: 'Penang',
-      contactedBankPerson: 'Nurul Huda',
-      status: 'escalated',
-      detectedIssues: ['Transaction delay', 'Poor customer service'],
-      sentiment: 'negative'
-    },
-    {
-      id: 'F004',
-      date: '2025-05-22',
-      customerName: 'Fatimah Zahra',
-      customerPhone: '+60-13-8765432',
-      customerEmail: 'fatimah.zahra@email.com',
-      serviceType: 'OnlineBanking',
-      reviewText: 'Proses permohonan pinjaman yang cepat dan mudah melalui laman web. Sangat berpuas hati dengan perkhidmatan.',
-      reviewRating: 4,
-      issueLocation: 'Johor Bahru',
-      contactedBankPerson: 'Muhammad Hafiz',
-      status: 'resolved',
-      detectedIssues: ['Positive feedback'],
-      sentiment: 'positive'
-    },
-    {
-      id: 'F005',
-      date: '2025-05-21',
-      customerName: 'Chen Wei',
-      customerPhone: '+60-17-5432109',
-      customerEmail: 'chen.wei@email.com',
-      serviceType: 'ATM',
-      reviewText: 'ATM kehabisan wang tunai semasa waktu puncak. Ini kerap berlaku di lokasi ini.',
-      reviewRating: 2,
-      issueLocation: 'Melaka',
-      contactedBankPerson: 'Azman Ismail',
-      status: 'new',
-      detectedIssues: ['ATM out of cash'],
-      sentiment: 'negative'
-    }
-  ];
-
-  const filteredData = feedbackData.filter(feedback => {
-    const matchesSearch = feedback.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         feedback.reviewText.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         feedback.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || feedback.status === statusFilter;
-    const matchesService = serviceFilter === 'all' || feedback.serviceType === serviceFilter;
-    
-    return matchesSearch && matchesStatus && matchesService;
+  
+  const { feedback, updateFeedback, isLoading } = useFeedback({
+    search: searchTerm,
+    status: statusFilter,
+    service: serviceFilter
   });
 
   const getStatusBadge = (status: string) => {
@@ -141,9 +59,16 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
   };
 
   const updateStatus = (feedbackId: string, newStatus: string) => {
-    console.log(`Updating feedback ${feedbackId} status to ${newStatus}`);
-    // Here you would update the status in your MySQL backend
+    updateFeedback({ id: feedbackId, updates: { status: newStatus as any } });
   };
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        Loading feedback data...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -162,22 +87,22 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.map((feedback) => (
-              <TableRow key={feedback.id}>
-                <TableCell className="font-medium">{feedback.id}</TableCell>
+            {feedback.map((feedbackItem) => (
+              <TableRow key={feedbackItem.id}>
+                <TableCell className="font-medium">{feedbackItem.id}</TableCell>
                 <TableCell>
                   <div>
-                    <div className="font-medium">{feedback.customerName}</div>
-                    <div className="text-sm text-gray-500">{feedback.issueLocation}</div>
+                    <div className="font-medium">{feedbackItem.customer_name}</div>
+                    <div className="text-sm text-gray-500">{feedbackItem.issue_location}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{feedback.serviceType}</Badge>
+                  <Badge variant="outline">{feedbackItem.service_type}</Badge>
                 </TableCell>
-                <TableCell>{getRatingStars(feedback.reviewRating)}</TableCell>
-                <TableCell>{getSentimentBadge(feedback.sentiment)}</TableCell>
+                <TableCell>{getRatingStars(feedbackItem.review_rating)}</TableCell>
+                <TableCell>{getSentimentBadge(feedbackItem.sentiment)}</TableCell>
                 <TableCell>
-                  <Select value={feedback.status} onValueChange={(value) => updateStatus(feedback.id, value)}>
+                  <Select value={feedbackItem.status} onValueChange={(value) => updateStatus(feedbackItem.id, value)}>
                     <SelectTrigger className="w-32">
                       <SelectValue />
                     </SelectTrigger>
@@ -189,21 +114,21 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell>{feedback.date}</TableCell>
+                <TableCell>{new Date(feedbackItem.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setSelectedFeedback(feedback)}
+                        onClick={() => setSelectedFeedback(feedbackItem)}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
                       <DialogHeader>
-                        <DialogTitle>Feedback Details - {feedback.id}</DialogTitle>
+                        <DialogTitle>Feedback Details - {feedbackItem.id}</DialogTitle>
                         <DialogDescription>
                           Complete feedback information and detected issues
                         </DialogDescription>
@@ -214,40 +139,40 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
                           <div className="grid grid-cols-2 gap-4">
                             <div className="flex items-center space-x-2">
                               <User className="w-4 h-4 text-gray-500" />
-                              <span className="font-medium">{selectedFeedback.customerName}</span>
+                              <span className="font-medium">{selectedFeedback.customer_name}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Calendar className="w-4 h-4 text-gray-500" />
-                              <span>{selectedFeedback.date}</span>
+                              <span>{new Date(selectedFeedback.created_at).toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <MapPin className="w-4 h-4 text-gray-500" />
-                              <span>{selectedFeedback.issueLocation}</span>
+                              <span>{selectedFeedback.issue_location}</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <Star className="w-4 h-4 text-gray-500" />
-                              {getRatingStars(selectedFeedback.reviewRating)}
+                              {getRatingStars(selectedFeedback.review_rating)}
                             </div>
                           </div>
                           
                           <div>
                             <h4 className="font-semibold mb-2">Contact Information</h4>
-                            <p className="text-sm text-gray-600">Phone: {selectedFeedback.customerPhone}</p>
-                            <p className="text-sm text-gray-600">Email: {selectedFeedback.customerEmail}</p>
-                            <p className="text-sm text-gray-600">Bank Contact: {selectedFeedback.contactedBankPerson}</p>
+                            <p className="text-sm text-gray-600">Phone: {selectedFeedback.customer_phone || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Email: {selectedFeedback.customer_email || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">Bank Contact: {selectedFeedback.contacted_bank_person || 'N/A'}</p>
                           </div>
                           
                           <div>
                             <h4 className="font-semibold mb-2">Review Text</h4>
-                            <p className="text-sm bg-gray-50 p-3 rounded">{selectedFeedback.reviewText}</p>
+                            <p className="text-sm bg-gray-50 p-3 rounded">{selectedFeedback.review_text}</p>
                           </div>
                           
                           <div>
                             <h4 className="font-semibold mb-2">Detected Issues</h4>
                             <div className="flex flex-wrap gap-2">
-                              {selectedFeedback.detectedIssues.map((issue: string, index: number) => (
+                              {selectedFeedback.detected_issues?.map((issue: string, index: number) => (
                                 <Badge key={index} variant="outline">{issue}</Badge>
-                              ))}
+                              )) || <span className="text-gray-500">No issues detected</span>}
                             </div>
                           </div>
                         </div>
@@ -261,9 +186,9 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter }: FeedbackTabl
         </Table>
       </div>
       
-      {filteredData.length === 0 && (
+      {feedback.length === 0 && (
         <div className="text-center py-8 text-gray-500">
-          No feedback records found matching your criteria.
+          No feedback records found. {feedback.length === 0 && !isLoading && "Please connect to Supabase to view real data."}
         </div>
       )}
     </div>

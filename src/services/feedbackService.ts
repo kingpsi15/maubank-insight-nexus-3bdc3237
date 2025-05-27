@@ -1,7 +1,6 @@
 
 import { supabase, isDemoMode } from './supabase';
 import { Feedback } from './types';
-import { mockFeedback } from './mockData';
 
 // Feedback operations
 export const feedbackService = {
@@ -13,8 +12,8 @@ export const feedbackService = {
     dateTo?: string;
   } = {}) {
     if (isDemoMode) {
-      console.log('Demo mode: returning mock feedback data');
-      return mockFeedback;
+      console.log('Demo mode: Supabase not connected. Please connect to Supabase to use real data.');
+      return [];
     }
 
     let query = supabase
@@ -44,13 +43,13 @@ export const feedbackService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
     if (isDemoMode) {
       console.log('Demo mode: would create feedback', feedback);
-      return { ...feedback, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      throw new Error('Supabase not connected. Please connect to Supabase to create feedback.');
     }
 
     const { data, error } = await supabase
@@ -66,7 +65,7 @@ export const feedbackService = {
   async update(id: string, updates: Partial<Feedback>) {
     if (isDemoMode) {
       console.log('Demo mode: would update feedback', id, updates);
-      return { ...mockFeedback[0], ...updates };
+      throw new Error('Supabase not connected. Please connect to Supabase to update feedback.');
     }
 
     const { data, error } = await supabase
@@ -83,7 +82,7 @@ export const feedbackService = {
   async delete(id: string) {
     if (isDemoMode) {
       console.log('Demo mode: would delete feedback', id);
-      return;
+      throw new Error('Supabase not connected. Please connect to Supabase to delete feedback.');
     }
 
     const { error } = await supabase
@@ -96,12 +95,8 @@ export const feedbackService = {
 
   async getMetrics(filters: { dateRange?: string; service?: string; location?: string } = {}) {
     if (isDemoMode) {
-      const data = mockFeedback;
-      const total = data.length;
-      const positive = data.filter(f => f.sentiment === 'positive').length;
-      const negative = data.filter(f => f.sentiment === 'negative').length;
-      const avgRating = data.length > 0 ? data.reduce((sum, f) => sum + f.review_rating, 0) / data.length : 0;
-      return { total, positive, negative, avgRating, data };
+      console.log('Demo mode: Supabase not connected. Please connect to Supabase to view metrics.');
+      return { total: 0, positive: 0, negative: 0, avgRating: 0, data: [] };
     }
 
     let query = supabase.from('feedback').select('*');
@@ -141,11 +136,12 @@ export const feedbackService = {
     const { data, error } = await query;
     if (error) throw error;
 
-    const total = data.length;
-    const positive = data.filter(f => f.sentiment === 'positive').length;
-    const negative = data.filter(f => f.sentiment === 'negative').length;
-    const avgRating = data.length > 0 ? data.reduce((sum, f) => sum + f.review_rating, 0) / data.length : 0;
+    const feedbackData = data || [];
+    const total = feedbackData.length;
+    const positive = feedbackData.filter(f => f.sentiment === 'positive').length;
+    const negative = feedbackData.filter(f => f.sentiment === 'negative').length;
+    const avgRating = feedbackData.length > 0 ? feedbackData.reduce((sum, f) => sum + f.review_rating, 0) / feedbackData.length : 0;
 
-    return { total, positive, negative, avgRating, data };
+    return { total, positive, negative, avgRating, data: feedbackData };
   }
 };
