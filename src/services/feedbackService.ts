@@ -36,11 +36,12 @@ export const feedbackService = {
       throw error;
     }
 
-    // Cast service_type and status to ensure type safety
+    // Cast service_type, status, and sentiment to ensure type safety
     return (data || []).map(item => ({
       ...item,
       service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
-      status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
+      status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated',
+      sentiment: item.sentiment as 'positive' | 'negative' | 'neutral'
     }));
   },
 
@@ -55,11 +56,12 @@ export const feedbackService = {
         throw error;
       }
 
-      // Cast service_type and status to ensure type safety
+      // Cast service_type, status, and sentiment to ensure type safety
       return (data || []).map(item => ({
         ...item,
         service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
-        status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
+        status: item.status as 'new' | 'in_progress' | 'resolved' | 'escalated',
+        sentiment: item.sentiment as 'positive' | 'negative' | 'neutral'
       }));
     } catch (error) {
       console.error("Unexpected error fetching feedback:", error);
@@ -83,7 +85,8 @@ export const feedbackService = {
       return {
         ...data,
         service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
-        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated',
+        sentiment: data.sentiment as 'positive' | 'negative' | 'neutral'
       };
     } catch (error) {
       console.error("Unexpected error creating feedback:", error);
@@ -108,7 +111,8 @@ export const feedbackService = {
       return {
         ...data,
         service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
-        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated',
+        sentiment: data.sentiment as 'positive' | 'negative' | 'neutral'
       };
     } catch (error) {
       console.error("Unexpected error updating feedback:", error);
@@ -133,7 +137,8 @@ export const feedbackService = {
       return data ? {
         ...data,
         service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking',
-        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated'
+        status: data.status as 'new' | 'in_progress' | 'resolved' | 'escalated',
+        sentiment: data.sentiment as 'positive' | 'negative' | 'neutral'
       } : null;
     } catch (error) {
       console.error("Unexpected error updating feedback:", error);
