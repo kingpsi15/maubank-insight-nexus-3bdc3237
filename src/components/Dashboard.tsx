@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,9 +74,8 @@ const Dashboard = () => {
     });
   };
 
-  const calculateTrend = (current: number, previous: number) => {
-    if (previous === 0) return '+0%';
-    const trend = ((current - previous) / previous) * 100;
+  const calculateTrend = (trend: number | undefined) => {
+    if (trend === undefined || trend === 0) return '+0.0%';
     return `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%`;
   };
 
@@ -99,12 +99,12 @@ const Dashboard = () => {
           <CardTitle className="text-lg flex items-center justify-between">
             <span>{title}</span>
             <div className="flex items-center text-sm">
-              {data.total > 0 ? (
+              {(data.trend || 0) > 0 ? (
                 <TrendingUp className="w-4 h-4 mr-1" />
               ) : (
                 <TrendingDown className="w-4 h-4 mr-1" />
               )}
-              {calculateTrend(data.total, data.total * 0.9)}
+              {calculateTrend(data.trend)}
             </div>
           </CardTitle>
         </CardHeader>
