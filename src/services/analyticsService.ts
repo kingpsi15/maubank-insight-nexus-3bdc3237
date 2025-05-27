@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const analyticsService = {
@@ -351,43 +350,12 @@ export const analyticsService = {
   async getTopIssues(filters: any = {}) {
     console.log('analyticsService.getTopIssues called with filters:', filters);
     
-    let query = supabase.from('feedback').select('detected_issues, service_type');
-    
-    // Apply all filters
-    if (filters.service && filters.service !== 'all') {
-      query = query.eq('service_type', filters.service);
-    }
-    
-    if (filters.location && filters.location !== 'all') {
-      query = query.eq('issue_location', filters.location);
-    }
-
-    // Apply date filters
-    if (filters.customDateFrom && filters.customDateTo) {
-      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
-    } else if (filters.dateRange && filters.dateRange !== 'all') {
-      const now = new Date();
-      let startDate: Date;
-      
-      switch (filters.dateRange) {
-        case 'last_week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'last_month':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        case 'last_quarter':
-          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-          break;
-        case 'last_year':
-          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      }
-      
-      query = query.gte('created_at', startDate.toISOString());
-    }
+    let query = supabase
+      .from('issues')
+      .select('title, feedback_count, category, status')
+      .eq('status', 'approved')
+      .order('feedback_count', { ascending: false })
+      .limit(10);
 
     const { data, error } = await query;
     if (error) {
@@ -395,23 +363,11 @@ export const analyticsService = {
       return [];
     }
 
-    // Count issues frequency
-    const issueCount: { [key: string]: number } = {};
-
-    data?.forEach(item => {
-      if (item.detected_issues && Array.isArray(item.detected_issues)) {
-        item.detected_issues.forEach((issue: string) => {
-          if (issue && issue.trim()) {
-            issueCount[issue] = (issueCount[issue] || 0) + 1;
-          }
-        });
-      }
-    });
-
-    const result = Object.entries(issueCount)
-      .map(([issue, count]) => ({ issue, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 issues
+    const result = data?.map(issue => ({
+      issue: issue.title,
+      count: issue.feedback_count || 0,
+      category: issue.category
+    })) || [];
 
     console.log('getTopIssues returning:', result);
     return result;

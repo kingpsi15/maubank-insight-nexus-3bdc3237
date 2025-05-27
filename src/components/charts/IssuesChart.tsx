@@ -1,33 +1,37 @@
 
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 const IssuesChart = () => {
-  const data = [
-    { issue: 'ATM Card Stuck', count: 89, service: 'ATM' },
-    { issue: 'Login Failed', count: 67, service: 'Online Banking' },
-    { issue: 'Transaction Delay', count: 56, service: 'Core Banking' },
-    { issue: 'Cash Not Dispensed', count: 45, service: 'ATM' },
-    { issue: 'App Crashes', count: 43, service: 'Online Banking' },
-    { issue: 'Balance Mismatch', count: 38, service: 'Core Banking' },
-    { issue: 'Receipt Not Printed', count: 34, service: 'ATM' },
-    { issue: 'Page Timeout', count: 29, service: 'Online Banking' }
-  ];
+  const { issuesData, isLoading } = useAnalytics();
 
-  const getBarColor = (service: string) => {
-    switch (service) {
-      case 'ATM': return '#3B82F6';
-      case 'Online Banking': return '#10B981';
-      case 'Core Banking': return '#F59E0B';
-      default: return '#6B7280';
-    }
+  if (isLoading) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-gray-500">Loading issues data...</div>
+      </div>
+    );
+  }
+
+  if (!issuesData || issuesData.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-gray-500">No issues data available</div>
+      </div>
+    );
+  }
+
+  const getBarColor = (index: number) => {
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#84CC16'];
+    return colors[index % colors.length];
   };
 
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
-          data={data} 
+          data={issuesData} 
           margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
           layout="horizontal"
         >
@@ -40,14 +44,11 @@ const IssuesChart = () => {
             width={120}
           />
           <Tooltip 
-            formatter={(value: any, name: any, props: any) => [
-              value, 
-              `Occurrences (${props.payload.service})`
-            ]}
+            formatter={(value: any) => [value, 'Occurrences']}
           />
           <Bar dataKey="count">
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={getBarColor(entry.service)} />
+            {issuesData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={getBarColor(index)} />
             ))}
           </Bar>
         </BarChart>
