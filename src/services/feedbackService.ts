@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
@@ -356,7 +357,9 @@ export const feedbackService = {
   } = {}) {
     let query = supabase.from('feedback').select('*');
     
+    // Apply service filter FIRST - this is the key fix
     if (filters.service && filters.service !== 'all') {
+      console.log('Filtering by service:', filters.service);
       query = query.eq('service_type', filters.service);
     }
     
@@ -392,9 +395,14 @@ export const feedbackService = {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching metrics:', error);
+      throw error;
+    }
 
     const feedbackData = data || [];
+    console.log('Filtered feedback data:', feedbackData.length, 'records for service:', filters.service);
+    
     const total = feedbackData.length;
     const positive = feedbackData.filter(f => f.sentiment === 'positive').length;
     const negative = feedbackData.filter(f => f.sentiment === 'negative').length;

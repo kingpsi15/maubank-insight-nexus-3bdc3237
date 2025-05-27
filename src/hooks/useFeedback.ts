@@ -87,6 +87,9 @@ export const useFeedback = (filters: any = {}) => {
 export const useFeedbackMetrics = (filters: any = {}) => {
   return useQuery({
     queryKey: ['feedback-metrics', filters],
-    queryFn: () => feedbackService.getMetrics(filters),
+    queryFn: () => {
+      console.log('Fetching metrics with filters:', filters);
+      return feedbackService.getMetrics(filters);
+    },
   });
 };

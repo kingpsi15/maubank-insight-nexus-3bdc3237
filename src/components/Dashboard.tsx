@@ -34,9 +34,22 @@ const Dashboard = () => {
   };
 
   const { data: overallMetrics, isLoading } = useFeedbackMetrics(filters);
-  const { data: atmMetrics } = useFeedbackMetrics({ ...filters, service: 'ATM' });
-  const { data: coreBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'CoreBanking' });
-  const { data: onlineBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'OnlineBanking' });
+  
+  // Create specific filters for each service type
+  const { data: atmMetrics } = useFeedbackMetrics({ 
+    ...filters, 
+    service: 'ATM' 
+  });
+  
+  const { data: coreBankingMetrics } = useFeedbackMetrics({ 
+    ...filters, 
+    service: 'CoreBanking' 
+  });
+  
+  const { data: onlineBankingMetrics } = useFeedbackMetrics({ 
+    ...filters, 
+    service: 'OnlineBanking' 
+  });
 
   // Get analytics data using the useAnalytics hook
   const {
