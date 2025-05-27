@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useFeedbackMetrics } from '@/hooks/useFeedback';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { supabase } from '@/integrations/supabase/client';
 import SentimentChart from '@/components/charts/SentimentChart';
 import ServiceChart from '@/components/charts/ServiceChart';
 import LocationChart from '@/components/charts/LocationChart';
