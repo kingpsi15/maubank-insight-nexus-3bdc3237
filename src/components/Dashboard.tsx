@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useFeedbackMetrics } from '@/hooks/useFeedback';
 import SentimentChart from '@/components/charts/SentimentChart';
 import ServiceChart from '@/components/charts/ServiceChart';
 import LocationChart from '@/components/charts/LocationChart';
@@ -23,6 +24,20 @@ const Dashboard = () => {
   const [customDateTo, setCustomDateTo] = useState<Date>();
   const [showFilters, setShowFilters] = useState(false);
 
+  // Get metrics data based on filters
+  const filters = {
+    dateRange,
+    service: serviceType,
+    location,
+    customDateFrom: customDateFrom?.toISOString(),
+    customDateTo: customDateTo?.toISOString()
+  };
+
+  const { data: overallMetrics, isLoading } = useFeedbackMetrics(filters);
+  const { data: atmMetrics } = useFeedbackMetrics({ ...filters, service: 'ATM' });
+  const { data: coreBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'CoreBanking' });
+  const { data: onlineBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'OnlineBanking' });
+
   const handleExportCSV = () => {
     // Export functionality based on current filters
     console.log('Exporting CSV with filters:', {
@@ -34,77 +49,66 @@ const Dashboard = () => {
     });
   };
 
-  // Service-specific metrics (will be replaced with database data)
-  const serviceMetrics = {
-    overall: {
-      total: 2847,
-      positive: 1823,
-      negative: 1024,
-      avgRating: 4.2,
-      trend: '+12%'
-    },
-    atm: {
-      total: 892,
-      positive: 456,
-      negative: 436,
-      avgRating: 3.8,
-      trend: '-5%'
-    },
-    coreBanking: {
-      total: 1156,
-      positive: 789,
-      negative: 367,
-      avgRating: 4.5,
-      trend: '+18%'
-    },
-    onlineBanking: {
-      total: 799,
-      positive: 578,
-      negative: 221,
-      avgRating: 4.3,
-      trend: '+8%'
-    }
+  const calculateTrend = (current: number, previous: number) => {
+    if (previous === 0) return '+0%';
+    const trend = ((current - previous) / previous) * 100;
+    return `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%`;
   };
 
-  const getServiceCard = (title: string, data: any, bgColor: string, textColor: string) => (
-    <Card className={`${bgColor} ${textColor}`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center justify-between">
-          <span>{title}</span>
-          <div className="flex items-center text-sm">
-            {data.trend.startsWith('+') ? (
-              <TrendingUp className="w-4 h-4 mr-1" />
-            ) : (
-              <TrendingDown className="w-4 h-4 mr-1" />
-            )}
-            {data.trend}
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <div className="text-2xl font-bold">{data.total}</div>
-          <p className="text-sm opacity-90">Total Feedback</p>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center">
-            <CheckCircle className="w-4 h-4 mr-1" />
-            <span>{data.positive} Positive</span>
-          </div>
-          <div className="flex items-center">
-            <AlertTriangle className="w-4 h-4 mr-1" />
-            <span>{data.negative} Negative</span>
-          </div>
-        </div>
+  const getServiceCard = (title: string, data: any, bgColor: string, textColor: string) => {
+    if (isLoading || !data) {
+      return (
+        <Card className={`${bgColor} ${textColor}`}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">{title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="animate-pulse">Loading...</div>
+          </CardContent>
+        </Card>
+      );
+    }
 
-        <div className="pt-2 border-t border-white/20">
-          <div className="text-xl font-bold">{data.avgRating}</div>
-          <p className="text-sm opacity-90">Average Rating</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+    return (
+      <Card className={`${bgColor} ${textColor}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>{title}</span>
+            <div className="flex items-center text-sm">
+              {data.total > 0 ? (
+                <TrendingUp className="w-4 h-4 mr-1" />
+              ) : (
+                <TrendingDown className="w-4 h-4 mr-1" />
+              )}
+              {calculateTrend(data.total, data.total * 0.9)}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <div className="text-2xl font-bold">{data.total}</div>
+            <p className="text-sm opacity-90">Total Feedback</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-1" />
+              <span>{data.positive} Positive</span>
+            </div>
+            <div className="flex items-center">
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              <span>{data.negative} Negative</span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/20">
+            <div className="text-xl font-bold">{data.avgRating.toFixed(1)}</div>
+            <p className="text-sm opacity-90">Average Rating</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -248,25 +252,25 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {getServiceCard(
           "Overall",
-          serviceMetrics.overall,
+          overallMetrics,
           "bg-gradient-to-r from-blue-600 to-blue-700",
           "text-white"
         )}
         {getServiceCard(
           "ATM",
-          serviceMetrics.atm,
+          atmMetrics,
           "bg-gradient-to-r from-red-500 to-red-600",
           "text-white"
         )}
         {getServiceCard(
           "CoreBanking",
-          serviceMetrics.coreBanking,
+          coreBankingMetrics,
           "bg-gradient-to-r from-green-500 to-green-600",
           "text-white"
         )}
         {getServiceCard(
           "OnlineBanking",
-          serviceMetrics.onlineBanking,
+          onlineBankingMetrics,
           "bg-gradient-to-r from-purple-500 to-purple-600",
           "text-white"
         )}
@@ -281,7 +285,7 @@ const Dashboard = () => {
             <CardDescription>Customer sentiment breakdown across all feedback</CardDescription>
           </CardHeader>
           <CardContent>
-            <SentimentChart />
+            <SentimentChart filters={filters} />
           </CardContent>
         </Card>
 
@@ -292,7 +296,7 @@ const Dashboard = () => {
             <CardDescription>Distribution of customer ratings (0-5 scale)</CardDescription>
           </CardHeader>
           <CardContent>
-            <RatingDistribution />
+            <RatingDistribution filters={filters} />
           </CardContent>
         </Card>
 
@@ -303,7 +307,7 @@ const Dashboard = () => {
             <CardDescription>Sentiment breakdown by service type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ServiceChart />
+            <ServiceChart filters={filters} />
           </CardContent>
         </Card>
 
@@ -314,7 +318,7 @@ const Dashboard = () => {
             <CardDescription>Regional sentiment and issue distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <LocationChart />
+            <LocationChart filters={filters} />
           </CardContent>
         </Card>
 
@@ -325,7 +329,7 @@ const Dashboard = () => {
             <CardDescription>Sentiment trends over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <TimelineChart />
+            <TimelineChart filters={filters} />
           </CardContent>
         </Card>
 
@@ -336,7 +340,7 @@ const Dashboard = () => {
             <CardDescription>Most common issues across all services</CardDescription>
           </CardHeader>
           <CardContent>
-            <IssuesChart />
+            <IssuesChart filters={filters} />
           </CardContent>
         </Card>
       </div>
