@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { feedbackService, Feedback } from '@/services/database';
+import { feedbackService, Feedback } from '@/services';
 import { useToast } from '@/hooks/use-toast';
 
 export const useFeedback = (filters: any = {}) => {
