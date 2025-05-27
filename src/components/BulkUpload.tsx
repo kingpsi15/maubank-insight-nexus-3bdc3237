@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,21 +20,23 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   const { toast } = useToast();
 
   const downloadTemplate = () => {
-    // Create CSV template
+    // Create CSV template with all mandatory fields
     const headers = [
+      'CustomerId',
       'CustomerName',
       'CustomerPhone', 
       'CustomerEmail',
       'ServiceType',
       'ReviewText',
       'ReviewRating',
+      'Date',
       'IssueLocation',
       'ContactedBankPerson'
     ];
     
     const sampleData = [
-      'John Doe,+91-9876543210,john@email.com,ATM,Great service,5,Mumbai,Rajesh Kumar',
-      'Jane Smith,+91-9876543211,jane@email.com,OnlineBanking,Login issues,2,Delhi,Priya Sharma'
+      'CUST001,John Doe,+91-9876543210,john@email.com,ATM,Great service,5,2024-01-15,Mumbai,Rajesh Kumar',
+      'CUST002,Jane Smith,+91-9876543211,jane@email.com,OnlineBanking,Login issues,2,2024-01-16,Delhi,Priya Sharma'
     ];
     
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -119,10 +120,25 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Download Template
           </CardTitle>
           <CardDescription>
-            Download the CSV template with the correct format and sample data
+            Download the CSV template with the correct format and sample data. All columns are mandatory.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-gray-600">
+            <p className="font-semibold mb-2">Required columns:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>CustomerId - Unique customer identifier</li>
+              <li>CustomerName - Full name of the customer</li>
+              <li>CustomerPhone - Phone number with country code</li>
+              <li>CustomerEmail - Valid email address</li>
+              <li>ServiceType - ATM, OnlineBanking, or CoreBanking</li>
+              <li>ReviewText - Customer feedback text</li>
+              <li>ReviewRating - Rating from 1 to 5</li>
+              <li>Date - Feedback date (YYYY-MM-DD format)</li>
+              <li>IssueLocation - Location where issue occurred</li>
+              <li>ContactedBankPerson - Name of bank employee contacted</li>
+            </ul>
+          </div>
           <Button onClick={downloadTemplate} variant="outline" className="flex items-center">
             <FileText className="w-4 h-4 mr-2" />
             Download CSV Template
@@ -138,7 +154,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Upload Feedback Data
           </CardTitle>
           <CardDescription>
-            Select a CSV file containing customer feedback data
+            Select a CSV file containing customer feedback data with all mandatory columns
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
