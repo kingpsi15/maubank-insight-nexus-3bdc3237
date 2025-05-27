@@ -27,11 +27,39 @@ const BulkUpload = () => {
   const { toast } = useToast();
   const { createFeedback } = useFeedback();
 
-  // Improved column mapping with exact header matching
-  const getColumnMapping = (headers: string[]) => {
+  // Improved column mapping with position-based fallback
+  const getColumnMapping = (headers: string[], sampleRow?: string[]) => {
     const mapping: { [key: string]: string } = {};
     
-    headers.forEach(header => {
+    console.log('Processing headers:', headers);
+    console.log('Sample row for reference:', sampleRow);
+    
+    // If we have a sample row, check if the first row might actually be data instead of headers
+    const firstRowLooksLikeData = sampleRow && (
+      !isNaN(Number(sampleRow[0])) || // First column is a number (rating)
+      sampleRow.some(cell => cell.includes('@')) || // Has email
+      sampleRow.some(cell => cell.includes('+')) || // Has phone
+      sampleRow.some(cell => cell.length > 50) // Has long text (review)
+    );
+
+    if (firstRowLooksLikeData) {
+      console.log('First row appears to be data, not headers. Using position-based mapping.');
+      // Use position-based mapping when headers are actually data
+      return {
+        '0': 'review_rating',
+        '1': 'customer_id', 
+        '2': 'customer_name',
+        '3': 'customer_phone',
+        '4': 'customer_email',
+        '5': 'service_type',
+        '6': 'review_text',
+        '7': 'created_at',
+        '8': 'issue_location',
+        '9': 'contacted_bank_person'
+      };
+    }
+    
+    headers.forEach((header, index) => {
       const trimmedHeader = header.trim();
       console.log('Processing header:', trimmedHeader);
       
@@ -159,9 +187,9 @@ const BulkUpload = () => {
     return 'ATM';
   };
 
-  const parseCSV = (csvText: string): CSVRow[] => {
+  const parseCSV = (csvText: string): { headers: string[], rows: CSVRow[], hasHeaders: boolean } => {
     const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
+    if (lines.length === 0) return { headers: [], rows: [], hasHeaders: false };
 
     // Handle quoted CSV values properly
     const parseCSVLine = (line: string): string[] => {
@@ -186,12 +214,47 @@ const BulkUpload = () => {
       return result;
     };
 
-    const headers = parseCSVLine(lines[0]);
-    console.log('CSV Headers detected:', headers);
+    const firstLineValues = parseCSVLine(lines[0]);
+    const secondLineValues = lines.length > 1 ? parseCSVLine(lines[1]) : null;
+    
+    console.log('First line values:', firstLineValues);
+    console.log('Second line values:', secondLineValues);
+    
+    // Check if first line looks like headers or data
+    const firstLineLooksLikeHeaders = firstLineValues.some(val => 
+      val.toLowerCase().includes('name') || 
+      val.toLowerCase().includes('email') || 
+      val.toLowerCase().includes('phone') ||
+      val.toLowerCase().includes('service') ||
+      val.toLowerCase().includes('review') ||
+      val.toLowerCase().includes('rating')
+    );
+    
+    const firstLineLooksLikeData = !isNaN(Number(firstLineValues[0])) || 
+                                   firstLineValues.some(val => val.includes('@')) ||
+                                   firstLineValues.some(val => val.includes('+')) ||
+                                   firstLineValues.some(val => val.length > 50);
+
+    let headers: string[];
+    let dataStartIndex: number;
+    let hasHeaders: boolean;
+
+    if (firstLineLooksLikeHeaders && !firstLineLooksLikeData) {
+      headers = firstLineValues;
+      dataStartIndex = 1;
+      hasHeaders = true;
+      console.log('Using first line as headers:', headers);
+    } else {
+      // Generate position-based headers
+      headers = firstLineValues.map((_, index) => index.toString());
+      dataStartIndex = 0;
+      hasHeaders = false;
+      console.log('Generated position-based headers:', headers);
+    }
     
     const rows: CSVRow[] = [];
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = dataStartIndex; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const row: CSVRow = {};
       
@@ -203,12 +266,13 @@ const BulkUpload = () => {
     }
 
     console.log('Parsed', rows.length, 'rows from CSV');
-    return rows;
+    return { headers, rows, hasHeaders };
   };
 
-  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
+  const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number, hasHeaders: boolean): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
     try {
-      const columnMapping = getColumnMapping(headers);
+      const sampleRow = hasHeaders ? null : Object.values(row);
+      const columnMapping = getColumnMapping(headers, sampleRow);
       const mappedRow: any = {};
       
       // Map columns using the dynamic mapping
@@ -224,6 +288,7 @@ const BulkUpload = () => {
       if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
         console.log('Available columns:', Object.keys(row));
         console.log('Column mapping:', columnMapping);
+        console.log('Raw row data:', Object.values(row));
         throw new Error(`Customer name missing - available columns: ${Object.keys(row).join(', ')}`);
       }
       if (!mappedRow.review_text || mappedRow.review_text.trim() === '') {
@@ -262,37 +327,14 @@ const BulkUpload = () => {
 
     try {
       const text = await file.text();
-      const rows = parseCSV(text);
+      const { headers, rows, hasHeaders } = parseCSV(text);
       
       if (rows.length === 0) {
         throw new Error('No valid data found in CSV file');
       }
 
-      const firstLine = text.split('\n')[0];
-      const parseCSVLine = (line: string): string[] => {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          
-          if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            result.push(current.trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        
-        result.push(current.trim());
-        return result;
-      };
-      
-      const headers = parseCSVLine(firstLine);
       console.log('Starting processing with headers:', headers);
+      console.log('Has headers:', hasHeaders);
 
       const stats = { total: rows.length, processed: 0, errors: 0 };
       const errors: string[] = [];
@@ -301,7 +343,7 @@ const BulkUpload = () => {
       // Process rows sequentially
       for (let i = 0; i < rows.length; i++) {
         try {
-          const feedback = mapRowToFeedback(rows[i], headers, i);
+          const feedback = mapRowToFeedback(rows[i], headers, i, hasHeaders);
           
           await new Promise<void>((resolve, reject) => {
             try {
@@ -488,7 +530,7 @@ const BulkUpload = () => {
               Optional: Customer ID, Customer Phone, Customer Email, Issue Location, Contacted Bank Person, Date
             </p>
             <p className="mt-2 text-xs font-medium">
-              Note: Column headers will be automatically detected and mapped
+              Note: CSV files with or without headers are supported. The system will auto-detect the format.
             </p>
           </div>
         </div>
