@@ -1,7 +1,48 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
 export const feedbackService = {
+  async getAll(filters: any = {}): Promise<Feedback[]> {
+    console.log('feedbackService.getAll called with filters:', filters);
+    
+    let query = supabase.from('feedback').select('*');
+    
+    // Apply filters
+    if (filters.search) {
+      query = query.or(`customer_name.ilike.%${filters.search}%,review_text.ilike.%${filters.search}%`);
+    }
+    
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+    
+    if (filters.service && filters.service !== 'all') {
+      query = query.eq('service_type', filters.service);
+    }
+    
+    if (filters.dateFrom) {
+      query = query.gte('created_at', filters.dateFrom);
+    }
+    
+    if (filters.dateTo) {
+      query = query.lte('created_at', filters.dateTo);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching feedback:", error);
+      throw error;
+    }
+
+    // Cast service_type to ensure type safety
+    return (data || []).map(item => ({
+      ...item,
+      service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+    }));
+  },
+
   async getAllFeedback(): Promise<Feedback[]> {
     try {
       const { data, error } = await supabase
@@ -13,10 +54,61 @@ export const feedbackService = {
         throw error;
       }
 
-      return data || [];
+      // Cast service_type to ensure type safety
+      return (data || []).map(item => ({
+        ...item,
+        service_type: item.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+      }));
     } catch (error) {
       console.error("Unexpected error fetching feedback:", error);
       return [];
+    }
+  },
+
+  async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>): Promise<Feedback> {
+    try {
+      const { data, error } = await supabase
+        .from('feedback')
+        .insert(feedback)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error("Error creating feedback:", error);
+        throw error;
+      }
+
+      return {
+        ...data,
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+      };
+    } catch (error) {
+      console.error("Unexpected error creating feedback:", error);
+      throw error;
+    }
+  },
+
+  async update(id: string, updates: Partial<Feedback>): Promise<Feedback> {
+    try {
+      const { data, error } = await supabase
+        .from('feedback')
+        .update(updates)
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error("Error updating feedback:", error);
+        throw error;
+      }
+
+      return {
+        ...data,
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+      };
+    } catch (error) {
+      console.error("Unexpected error updating feedback:", error);
+      throw error;
     }
   },
 
@@ -34,10 +126,32 @@ export const feedbackService = {
         throw error;
       }
 
-      return data || null;
+      return data ? {
+        ...data,
+        service_type: data.service_type as 'ATM' | 'OnlineBanking' | 'CoreBanking'
+      } : null;
     } catch (error) {
       console.error("Unexpected error updating feedback:", error);
       return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Error deleting feedback:", error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Unexpected error deleting feedback:", error);
+      return false;
     }
   },
 

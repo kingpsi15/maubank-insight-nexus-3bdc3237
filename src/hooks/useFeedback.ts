@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { feedbackService, Feedback } from '@/services';
+import { feedbackService } from '@/services/feedbackService';
+import { Feedback } from '@/services/types';
 import { useToast } from '@/hooks/use-toast';
 
 export const useFeedback = (filters: any = {}) => {
@@ -38,8 +39,8 @@ export const useFeedback = (filters: any = {}) => {
   };
 
   const createFeedbackMutation = useMutation({
-    mutationFn: feedbackService.create,
-    onSuccess: (data) => {
+    mutationFn: (data: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) => feedbackService.create(data),
+    onSuccess: (data: Feedback) => {
       console.log('Feedback created successfully:', data.id);
       invalidateAllFeedbackQueries();
       toast({
@@ -60,7 +61,7 @@ export const useFeedback = (filters: any = {}) => {
   const updateFeedbackMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Feedback> }) =>
       feedbackService.update(id, updates),
-    onSuccess: (data) => {
+    onSuccess: (data: Feedback) => {
       console.log('Feedback updated successfully:', data.id);
       invalidateAllFeedbackQueries();
       toast({
@@ -79,7 +80,7 @@ export const useFeedback = (filters: any = {}) => {
   });
 
   const deleteFeedbackMutation = useMutation({
-    mutationFn: feedbackService.delete,
+    mutationFn: (id: string) => feedbackService.delete(id),
     onSuccess: () => {
       console.log('Feedback deleted successfully');
       invalidateAllFeedbackQueries();
