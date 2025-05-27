@@ -103,8 +103,17 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   };
 
   const validateFeedbackData = (data: any, rowIndex: number): string | null => {
-    // Customer name is required - check if it's actually empty or just whitespace
-    if (!data.customerName || data.customerName.trim() === '' || data.customerName === 'undefined' || data.customerName === 'null') {
+    console.log(`Validating row ${rowIndex} data:`, data);
+    
+    // Customer name validation with detailed logging
+    if (!data.customerName) {
+      console.log(`Row ${rowIndex}: customerName is missing or falsy:`, data.customerName);
+      return 'Customer name is required and cannot be empty';
+    }
+    
+    const trimmedName = data.customerName.toString().trim();
+    if (trimmedName === '' || trimmedName === 'undefined' || trimmedName === 'null') {
+      console.log(`Row ${rowIndex}: customerName is empty after trimming:`, trimmedName);
       return 'Customer name is required and cannot be empty';
     }
     
@@ -130,7 +139,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
   const normalizeServiceType = (serviceType: string): 'ATM' | 'OnlineBanking' | 'CoreBanking' => {
     const normalized = serviceType.trim();
-    if (normalized === 'Core Banking') return 'CoreBanking';
+    if (normalized === 'Core Banking' || normalized === 'Core Operations') return 'CoreBanking';
     if (normalized === 'Online Banking') return 'OnlineBanking';
     if (normalized === 'ATM') return 'ATM';
     if (normalized === 'CoreBanking') return 'CoreBanking';
@@ -152,9 +161,11 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
         try {
           const text = event.target?.result as string;
           console.log('File content loaded, length:', text.length);
+          console.log('First 500 characters:', text.substring(0, 500));
           
           const lines = text.split(/\r?\n/).filter(line => line.trim());
           console.log('Total lines found:', lines.length);
+          console.log('First 3 lines:', lines.slice(0, 3));
           
           if (lines.length < 2) {
             throw new Error('CSV file must contain headers and at least one data row');
@@ -163,36 +174,44 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
           const headers = parseCSVLine(lines[0]).map(h => h.trim());
           console.log('Headers found:', headers);
           
-          // Map headers to expected format (handle both formats)
-          const headerMapping: { [key: string]: string } = {
-            'Customer ID': 'CustomerId',
-            'CustomerId': 'CustomerId',
-            'Customer Name': 'CustomerName',
-            'CustomerName': 'CustomerName',
-            'Customer Phone': 'CustomerPhone',
-            'CustomerPhone': 'CustomerPhone',
-            'Customer Email': 'CustomerEmail',
-            'CustomerEmail': 'CustomerEmail',
-            'Service Type': 'ServiceType',
-            'ServiceType': 'ServiceType',
-            'Review Text': 'ReviewText',
-            'ReviewText': 'ReviewText',
-            'Review Rating': 'ReviewRating',
-            'ReviewRating': 'ReviewRating',
-            'Date': 'Date',
-            'Issue Location': 'IssueLocation',
-            'IssueLocation': 'IssueLocation',
-            'Contacted Bank Person': 'ContactedBankPerson',
-            'ContactedBankPerson': 'ContactedBankPerson'
-          };
+          // Create a more flexible header mapping
+          const headerMapping = new Map<string, string>();
+          headers.forEach((header, index) => {
+            const cleanHeader = header.toLowerCase().replace(/[^a-z]/g, '');
+            console.log(`Header ${index}: "${header}" -> cleaned: "${cleanHeader}"`);
+            
+            if (cleanHeader.includes('customerid') || cleanHeader.includes('custid')) {
+              headerMapping.set(index.toString(), 'CustomerId');
+            } else if (cleanHeader.includes('customername') || cleanHeader.includes('custname') || cleanHeader.includes('name')) {
+              headerMapping.set(index.toString(), 'CustomerName');
+            } else if (cleanHeader.includes('customerphone') || cleanHeader.includes('phone')) {
+              headerMapping.set(index.toString(), 'CustomerPhone');
+            } else if (cleanHeader.includes('customeremail') || cleanHeader.includes('email')) {
+              headerMapping.set(index.toString(), 'CustomerEmail');
+            } else if (cleanHeader.includes('servicetype') || cleanHeader.includes('service')) {
+              headerMapping.set(index.toString(), 'ServiceType');
+            } else if (cleanHeader.includes('reviewtext') || cleanHeader.includes('review') || cleanHeader.includes('text')) {
+              headerMapping.set(index.toString(), 'ReviewText');
+            } else if (cleanHeader.includes('reviewrating') || cleanHeader.includes('rating')) {
+              headerMapping.set(index.toString(), 'ReviewRating');
+            } else if (cleanHeader.includes('date')) {
+              headerMapping.set(index.toString(), 'Date');
+            } else if (cleanHeader.includes('issuelocation') || cleanHeader.includes('location')) {
+              headerMapping.set(index.toString(), 'IssueLocation');
+            } else if (cleanHeader.includes('contactedbankperson') || cleanHeader.includes('bankperson') || cleanHeader.includes('contacted')) {
+              headerMapping.set(index.toString(), 'ContactedBankPerson');
+            }
+          });
 
-          const normalizedHeaders = headers.map(h => headerMapping[h] || h);
-          const requiredHeaders = ['CustomerName', 'ServiceType', 'ReviewText', 'ReviewRating'];
-          
+          console.log('Header mapping:', Array.from(headerMapping.entries()));
+
           // Check for required headers
-          const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
+          const requiredFields = ['CustomerName', 'ServiceType', 'ReviewText', 'ReviewRating'];
+          const mappedValues = Array.from(headerMapping.values());
+          const missingHeaders = requiredFields.filter(field => !mappedValues.includes(field));
+          
           if (missingHeaders.length > 0) {
-            throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
+            throw new Error(`Missing required columns: ${missingHeaders.join(', ')}. Found headers: ${headers.join(', ')}`);
           }
 
           const dataRows = lines.slice(1);
@@ -209,18 +228,21 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
             try {
               const values = parseCSVLine(dataRows[i]);
-              console.log(`Row ${rowIndex} values:`, values);
+              console.log(`Row ${rowIndex} raw values (${values.length}):`, values);
               
-              if (values.length !== headers.length) {
-                errors.push({ row: rowIndex, error: `Expected ${headers.length} columns, got ${values.length}` });
+              if (values.length === 0 || values.every(v => !v || v.trim() === '')) {
+                console.log(`Row ${rowIndex}: Skipping empty row`);
                 continue;
               }
 
               const rowData: any = {};
               headers.forEach((header, index) => {
-                const normalizedHeader = headerMapping[header] || header;
-                const value = values[index] || '';
-                rowData[normalizedHeader] = value;
+                const mappedHeader = headerMapping.get(index.toString());
+                if (mappedHeader) {
+                  const value = values[index] || '';
+                  rowData[mappedHeader] = value;
+                  console.log(`Row ${rowIndex}: ${mappedHeader} = "${value}"`);
+                }
               });
 
               console.log(`Row ${rowIndex} mapped data:`, rowData);
@@ -246,6 +268,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
               // Validate the data
               const validationError = validateFeedbackData(feedbackItem, rowIndex);
               if (validationError) {
+                console.log(`Row ${rowIndex} validation failed:`, validationError);
                 errors.push({ row: rowIndex, error: validationError });
                 continue;
               }
@@ -276,6 +299,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
           }
 
           setProgress(100);
+          setUploading(false);
 
           const result: UploadResult = {
             totalRows: dataRows.length,
@@ -370,7 +394,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Upload Feedback Data
           </CardTitle>
           <CardDescription>
-            Select a CSV file containing customer feedback data. Make sure the Customer Name column has actual data in each row.
+            Select a CSV file containing customer feedback data. The system will automatically detect column headers.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
