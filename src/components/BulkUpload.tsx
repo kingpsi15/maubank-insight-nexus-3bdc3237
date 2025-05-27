@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -153,11 +154,27 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
   const normalizeServiceType = (serviceType: string): 'ATM' | 'OnlineBanking' | 'CoreBanking' => {
     const normalized = serviceType.trim();
-    if (normalized === 'Core Banking' || normalized === 'Core Operations') return 'CoreBanking';
-    if (normalized === 'Online Banking') return 'OnlineBanking';
-    if (normalized === 'ATM') return 'ATM';
-    if (normalized === 'CoreBanking') return 'CoreBanking';
-    if (normalized === 'OnlineBanking') return 'OnlineBanking';
+    console.log('Normalizing service type:', normalized);
+    
+    // Handle various forms of Online Banking
+    if (normalized === 'Online Banking' || normalized === 'OnlineBanking' || normalized.toLowerCase() === 'online banking') {
+      console.log('Mapped to OnlineBanking');
+      return 'OnlineBanking';
+    }
+    
+    // Handle various forms of Core Banking
+    if (normalized === 'Core Banking' || normalized === 'CoreBanking' || normalized === 'Core Operations' || normalized.toLowerCase() === 'core banking') {
+      console.log('Mapped to CoreBanking');
+      return 'CoreBanking';
+    }
+    
+    // Handle ATM
+    if (normalized === 'ATM' || normalized.toLowerCase() === 'atm') {
+      console.log('Mapped to ATM');
+      return 'ATM';
+    }
+    
+    console.log('Using default CoreBanking for:', normalized);
     return 'CoreBanking'; // default fallback
   };
 
