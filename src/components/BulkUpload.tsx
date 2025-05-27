@@ -29,7 +29,6 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   const { toast } = useToast();
 
   const downloadTemplate = () => {
-    // Create CSV template matching the actual format from the Excel file
     const headers = [
       'Customer ID',
       'Customer Name', 
@@ -44,9 +43,9 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     ];
     
     const sampleData = [
-      '15575025,Aarti Perni,+230 2878,xyz@gmail.com,Core Banking,State Maubank issue,4,########,Maubank,Mr. Gopal',
-      '70165007,Vikash Pillai,+230 2467,ab@gmail.com,Core Banking,I have my issue,5,########,Maubank,Ms. Dindoyal',
-      '64935944,Aarti Perni,+230 4422,xyz@gmail.com,ATM,I am using ATM,5,########,Maubank,Ms. Beeharry'
+      '15575025,Aarti Perni,+230 2878585,xyz@gmail.com,Core Banking,State Maubank issue resolved quickly,4,2024-01-15,Maubank,Mr. Gopal',
+      '70165007,Vikash Pillai,+230 2467823,ab@gmail.com,Core Banking,I have my issue resolved,5,2024-01-16,Maubank,Ms. Dindoyal',
+      '64935944,Siti Rahman,+230 4422456,siti@gmail.com,ATM,ATM service was excellent,5,2024-01-17,Maubank,Ms. Beeharry'
     ];
     
     const csvContent = [headers.join(','), ...sampleData].join('\n');
@@ -72,6 +71,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
       }
       setFile(selectedFile);
       setUploadResult(null);
+      console.log('File selected:', selectedFile.name, 'Size:', selectedFile.size);
     }
   };
 
@@ -103,8 +103,9 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   };
 
   const validateFeedbackData = (data: any, rowIndex: number): string | null => {
-    if (!data.customerName || data.customerName.trim() === '') {
-      return 'Customer name is required';
+    // Customer name is required - check if it's actually empty or just whitespace
+    if (!data.customerName || data.customerName.trim() === '' || data.customerName === 'undefined' || data.customerName === 'null') {
+      return 'Customer name is required and cannot be empty';
     }
     
     if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking', 'Core Banking', 'Online Banking'].includes(data.serviceType)) {
@@ -120,7 +121,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
       return 'Review rating must be a number between 1 and 5';
     }
     
-    if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
+    if (data.customerEmail && data.customerEmail !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
       return 'Invalid email format';
     }
     
@@ -144,130 +145,175 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     setProgress(0);
 
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      // Use FileReader to handle file reading more reliably
+      const fileReader = new FileReader();
       
-      if (lines.length < 2) {
-        throw new Error('CSV file must contain headers and at least one data row');
-      }
-
-      const headers = parseCSVLine(lines[0]).map(h => h.trim());
-      console.log('Headers found:', headers);
-      
-      // Map headers to expected format (handle both formats)
-      const headerMapping: { [key: string]: string } = {
-        'Customer ID': 'CustomerId',
-        'CustomerId': 'CustomerId',
-        'Customer Name': 'CustomerName',
-        'CustomerName': 'CustomerName',
-        'Customer Phone': 'CustomerPhone',
-        'CustomerPhone': 'CustomerPhone',
-        'Customer Email': 'CustomerEmail',
-        'CustomerEmail': 'CustomerEmail',
-        'Service Type': 'ServiceType',
-        'ServiceType': 'ServiceType',
-        'Review Text': 'ReviewText',
-        'ReviewText': 'ReviewText',
-        'Review Rating': 'ReviewRating',
-        'ReviewRating': 'ReviewRating',
-        'Date': 'Date',
-        'Issue Location': 'IssueLocation',
-        'IssueLocation': 'IssueLocation',
-        'Contacted Bank Person': 'ContactedBankPerson',
-        'ContactedBankPerson': 'ContactedBankPerson'
-      };
-
-      const normalizedHeaders = headers.map(h => headerMapping[h] || h);
-      const requiredHeaders = ['CustomerName', 'ServiceType', 'ReviewText', 'ReviewRating'];
-      
-      // Check for required headers
-      const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
-      if (missingHeaders.length > 0) {
-        throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
-      }
-
-      const dataRows = lines.slice(1);
-      const feedbackData: any[] = [];
-      const errors: Array<{ row: number; error: string }> = [];
-
-      // Process each row
-      for (let i = 0; i < dataRows.length; i++) {
-        const rowIndex = i + 2; // +2 because we skip header and arrays are 0-indexed
-        const progress = Math.round((i / dataRows.length) * 80); // 80% for processing
-        setProgress(progress);
-
+      fileReader.onload = async (event) => {
         try {
-          const values = parseCSVLine(dataRows[i]);
+          const text = event.target?.result as string;
+          console.log('File content loaded, length:', text.length);
           
-          if (values.length !== headers.length) {
-            errors.push({ row: rowIndex, error: `Expected ${headers.length} columns, got ${values.length}` });
-            continue;
+          const lines = text.split(/\r?\n/).filter(line => line.trim());
+          console.log('Total lines found:', lines.length);
+          
+          if (lines.length < 2) {
+            throw new Error('CSV file must contain headers and at least one data row');
           }
 
-          const rowData: any = {};
-          headers.forEach((header, index) => {
-            const normalizedHeader = headerMapping[header] || header;
-            rowData[normalizedHeader] = values[index] || '';
-          });
-
-          // Convert to our format
-          const feedbackItem = {
-            customer_id: rowData.CustomerId || null,
-            customer_name: rowData.CustomerName,
-            customer_phone: rowData.CustomerPhone || null,
-            customer_email: rowData.CustomerEmail || null,
-            service_type: normalizeServiceType(rowData.ServiceType),
-            review_text: rowData.ReviewText,
-            review_rating: parseInt(rowData.ReviewRating) || 1,
-            issue_location: rowData.IssueLocation || null,
-            contacted_bank_person: rowData.ContactedBankPerson || null,
-            status: 'new' as const,
-            sentiment: 'neutral' as const,
-            detected_issues: []
+          const headers = parseCSVLine(lines[0]).map(h => h.trim());
+          console.log('Headers found:', headers);
+          
+          // Map headers to expected format (handle both formats)
+          const headerMapping: { [key: string]: string } = {
+            'Customer ID': 'CustomerId',
+            'CustomerId': 'CustomerId',
+            'Customer Name': 'CustomerName',
+            'CustomerName': 'CustomerName',
+            'Customer Phone': 'CustomerPhone',
+            'CustomerPhone': 'CustomerPhone',
+            'Customer Email': 'CustomerEmail',
+            'CustomerEmail': 'CustomerEmail',
+            'Service Type': 'ServiceType',
+            'ServiceType': 'ServiceType',
+            'Review Text': 'ReviewText',
+            'ReviewText': 'ReviewText',
+            'Review Rating': 'ReviewRating',
+            'ReviewRating': 'ReviewRating',
+            'Date': 'Date',
+            'Issue Location': 'IssueLocation',
+            'IssueLocation': 'IssueLocation',
+            'Contacted Bank Person': 'ContactedBankPerson',
+            'ContactedBankPerson': 'ContactedBankPerson'
           };
 
-          // Validate the data
-          const validationError = validateFeedbackData(feedbackItem, rowIndex);
-          if (validationError) {
-            errors.push({ row: rowIndex, error: validationError });
-            continue;
+          const normalizedHeaders = headers.map(h => headerMapping[h] || h);
+          const requiredHeaders = ['CustomerName', 'ServiceType', 'ReviewText', 'ReviewRating'];
+          
+          // Check for required headers
+          const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
+          if (missingHeaders.length > 0) {
+            throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
           }
 
-          feedbackData.push(feedbackItem);
+          const dataRows = lines.slice(1);
+          const feedbackData: any[] = [];
+          const errors: Array<{ row: number; error: string }> = [];
+
+          console.log('Processing', dataRows.length, 'data rows');
+
+          // Process each row
+          for (let i = 0; i < dataRows.length; i++) {
+            const rowIndex = i + 2; // +2 because we skip header and arrays are 0-indexed
+            const progress = Math.round((i / dataRows.length) * 80); // 80% for processing
+            setProgress(progress);
+
+            try {
+              const values = parseCSVLine(dataRows[i]);
+              console.log(`Row ${rowIndex} values:`, values);
+              
+              if (values.length !== headers.length) {
+                errors.push({ row: rowIndex, error: `Expected ${headers.length} columns, got ${values.length}` });
+                continue;
+              }
+
+              const rowData: any = {};
+              headers.forEach((header, index) => {
+                const normalizedHeader = headerMapping[header] || header;
+                const value = values[index] || '';
+                rowData[normalizedHeader] = value;
+              });
+
+              console.log(`Row ${rowIndex} mapped data:`, rowData);
+
+              // Convert to our format
+              const feedbackItem = {
+                customer_id: rowData.CustomerId || null,
+                customer_name: rowData.CustomerName || '',
+                customer_phone: rowData.CustomerPhone || null,
+                customer_email: rowData.CustomerEmail || null,
+                service_type: normalizeServiceType(rowData.ServiceType || ''),
+                review_text: rowData.ReviewText || '',
+                review_rating: parseInt(rowData.ReviewRating) || 1,
+                issue_location: rowData.IssueLocation || null,
+                contacted_bank_person: rowData.ContactedBankPerson || null,
+                status: 'new' as const,
+                sentiment: 'neutral' as const,
+                detected_issues: []
+              };
+
+              console.log(`Row ${rowIndex} feedback item:`, feedbackItem);
+
+              // Validate the data
+              const validationError = validateFeedbackData(feedbackItem, rowIndex);
+              if (validationError) {
+                errors.push({ row: rowIndex, error: validationError });
+                continue;
+              }
+
+              feedbackData.push(feedbackItem);
+            } catch (error) {
+              console.error(`Error processing row ${rowIndex}:`, error);
+              errors.push({ row: rowIndex, error: `Failed to parse row: ${error}` });
+            }
+          }
+
+          setProgress(85);
+
+          console.log('Valid feedback data count:', feedbackData.length);
+          console.log('Errors count:', errors.length);
+
+          // Bulk insert valid data
+          let successfulInserts = 0;
+          if (feedbackData.length > 0) {
+            try {
+              const inserted = await feedbackService.bulkCreate(feedbackData);
+              successfulInserts = inserted.length;
+              console.log('Successfully inserted:', successfulInserts);
+            } catch (error) {
+              console.error('Bulk insert error:', error);
+              errors.push({ row: 0, error: `Database error: ${error}` });
+            }
+          }
+
+          setProgress(100);
+
+          const result: UploadResult = {
+            totalRows: dataRows.length,
+            successful: successfulInserts,
+            failed: errors.length,
+            errors: errors.slice(0, 10) // Show only first 10 errors
+          };
+
+          setUploadResult(result);
+          
+          toast({
+            title: "Upload Complete",
+            description: `Successfully processed ${result.successful} out of ${result.totalRows} records.`,
+          });
+
         } catch (error) {
-          errors.push({ row: rowIndex, error: `Failed to parse row: ${error}` });
+          console.error('Upload processing error:', error);
+          toast({
+            title: "Upload Failed",
+            description: error instanceof Error ? error.message : "An error occurred while processing the file.",
+            variant: "destructive"
+          });
+          setUploading(false);
         }
-      }
-
-      setProgress(85);
-
-      // Bulk insert valid data
-      let successfulInserts = 0;
-      if (feedbackData.length > 0) {
-        try {
-          const inserted = await feedbackService.bulkCreate(feedbackData);
-          successfulInserts = inserted.length;
-        } catch (error) {
-          console.error('Bulk insert error:', error);
-          errors.push({ row: 0, error: `Database error: ${error}` });
-        }
-      }
-
-      setProgress(100);
-
-      const result: UploadResult = {
-        totalRows: dataRows.length,
-        successful: successfulInserts,
-        failed: errors.length,
-        errors: errors.slice(0, 10) // Show only first 10 errors
       };
 
-      setUploadResult(result);
-      
-      toast({
-        title: "Upload Complete",
-        description: `Successfully processed ${result.successful} out of ${result.totalRows} records.`,
-      });
+      fileReader.onerror = (error) => {
+        console.error('File reading error:', error);
+        toast({
+          title: "File Reading Failed",
+          description: "Could not read the selected file. Please try again.",
+          variant: "destructive"
+        });
+        setUploading(false);
+      };
+
+      // Read the file
+      fileReader.readAsText(file);
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -276,7 +322,6 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
         description: error instanceof Error ? error.message : "An error occurred while processing the file.",
         variant: "destructive"
       });
-    } finally {
       setUploading(false);
     }
   };
@@ -325,7 +370,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Upload Feedback Data
           </CardTitle>
           <CardDescription>
-            Select a CSV file containing customer feedback data. The system accepts both formats: "Customer Name" and "CustomerName".
+            Select a CSV file containing customer feedback data. Make sure the Customer Name column has actual data in each row.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
