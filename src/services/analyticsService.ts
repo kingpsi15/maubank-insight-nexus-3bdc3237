@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const analyticsService = {
@@ -363,14 +364,22 @@ export const analyticsService = {
       return [];
     }
 
-    const result = data?.map(issue => ({
-      issue: issue.title,
-      count: issue.feedback_count || 0,
-      category: issue.category,
-      description: issue.description
-    })) || [];
+    console.log('Raw issues data from database:', data);
+
+    // Filter out issues with zero feedback count and format the data
+    const result = data
+      ?.filter(issue => (issue.feedback_count || 0) > 0) // Only show issues with actual feedback
+      ?.map(issue => ({
+        issue: issue.title,
+        count: issue.feedback_count || 0,
+        category: issue.category,
+        description: issue.description
+      })) || [];
 
     console.log('getTopIssues returning:', result);
+    console.log('Total issues found:', result.length);
+    console.log('Total feedback across all issues:', result.reduce((sum, issue) => sum + issue.count, 0));
+    
     return result;
   }
 };
