@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, Plus, Search, Filter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useFeedback } from '@/hooks/useFeedback';
 import FeedbackTable from '@/components/FeedbackTable';
 import BulkUpload from '@/components/BulkUpload';
 
@@ -19,6 +20,7 @@ const FeedbackManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
   const { toast } = useToast();
+  const { createFeedback, isCreating } = useFeedback();
 
   const [formData, setFormData] = useState({
     customerName: '',
@@ -35,11 +37,11 @@ const FeedbackManagement = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.customerName || !formData.reviewText || !formData.reviewRating) {
+    if (!formData.customerName || !formData.reviewText || !formData.reviewRating || !formData.serviceType) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields.",
@@ -48,26 +50,39 @@ const FeedbackManagement = () => {
       return;
     }
 
-    // Simulate MySQL API call
-    console.log('Submitting feedback to MySQL database:', formData);
-    
-    toast({
-      title: "Feedback Added",
-      description: "Customer feedback has been successfully recorded in MySQL database.",
-    });
+    try {
+      // Create feedback object matching database schema
+      const feedbackData = {
+        customer_name: formData.customerName,
+        customer_phone: formData.customerPhone || null,
+        customer_email: formData.customerEmail || null,
+        service_type: formData.serviceType as 'ATM' | 'OnlineBanking' | 'CoreBanking',
+        review_text: formData.reviewText,
+        review_rating: parseInt(formData.reviewRating),
+        issue_location: formData.issueLocation || null,
+        contacted_bank_person: formData.contactedBankPerson || null,
+        status: 'new' as const,
+        sentiment: 'neutral' as const,
+        detected_issues: []
+      };
 
-    // Reset form
-    setFormData({
-      customerName: '',
-      customerPhone: '',
-      customerEmail: '',
-      serviceType: '',
-      reviewText: '',
-      reviewRating: '',
-      issueLocation: '',
-      contactedBankPerson: ''
-    });
-    setShowAddForm(false);
+      await createFeedback(feedbackData);
+
+      // Reset form
+      setFormData({
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        serviceType: '',
+        reviewText: '',
+        reviewRating: '',
+        issueLocation: '',
+        contactedBankPerson: ''
+      });
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error creating feedback:', error);
+    }
   };
 
   return (
@@ -153,7 +168,7 @@ const FeedbackManagement = () => {
         <Card>
           <CardHeader>
             <CardTitle>Bulk Upload Feedback</CardTitle>
-            <CardDescription>Upload multiple feedback entries via CSV file to MySQL database</CardDescription>
+            <CardDescription>Upload multiple feedback entries via CSV file to the database</CardDescription>
           </CardHeader>
           <CardContent>
             <BulkUpload onUploadComplete={() => setShowBulkUpload(false)} />
@@ -273,8 +288,8 @@ const FeedbackManagement = () => {
               </div>
 
               <div className="flex space-x-2">
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">
-                  Save Feedback
+                <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={isCreating}>
+                  {isCreating ? 'Saving...' : 'Save Feedback'}
                 </Button>
                 <Button
                   type="button"
@@ -293,7 +308,7 @@ const FeedbackManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle>Customer Feedback Records</CardTitle>
-          <CardDescription>View and manage all customer feedback entries from MySQL database</CardDescription>
+          <CardDescription>View and manage all customer feedback entries from the database</CardDescription>
         </CardHeader>
         <CardContent>
           <FeedbackTable 

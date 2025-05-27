@@ -1,15 +1,10 @@
 
-import { supabase, isDemoMode } from './supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Issue } from './types';
 
 // Issue operations
 export const issueService = {
   async getAll(status?: string) {
-    if (isDemoMode) {
-      console.log('Demo mode: Supabase not connected. Please connect to Supabase to view issues.');
-      return [];
-    }
-
     let query = supabase
       .from('issues')
       .select('*')
@@ -25,11 +20,6 @@ export const issueService = {
   },
 
   async create(issue: Omit<Issue, 'id' | 'created_at' | 'updated_at'>) {
-    if (isDemoMode) {
-      console.log('Demo mode: would create issue', issue);
-      throw new Error('Supabase not connected. Please connect to Supabase to create issues.');
-    }
-
     const { data, error } = await supabase
       .from('issues')
       .insert([issue])
@@ -41,11 +31,6 @@ export const issueService = {
   },
 
   async update(id: string, updates: Partial<Issue>) {
-    if (isDemoMode) {
-      console.log('Demo mode: would update issue', id, updates);
-      throw new Error('Supabase not connected. Please connect to Supabase to update issues.');
-    }
-
     const { data, error } = await supabase
       .from('issues')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -58,11 +43,6 @@ export const issueService = {
   },
 
   async approve(id: string, approvedBy: string, resolution?: string) {
-    if (isDemoMode) {
-      console.log('Demo mode: would approve issue', id);
-      throw new Error('Supabase not connected. Please connect to Supabase to approve issues.');
-    }
-
     const updates: Partial<Issue> = {
       status: 'approved',
       approved_by: approvedBy,
@@ -86,11 +66,6 @@ export const issueService = {
   },
 
   async reject(id: string) {
-    if (isDemoMode) {
-      console.log('Demo mode: would reject issue', id);
-      throw new Error('Supabase not connected. Please connect to Supabase to reject issues.');
-    }
-
     const { data, error } = await supabase
       .from('issues')
       .update({ 

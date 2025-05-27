@@ -1,5 +1,5 @@
 
-import { supabase, isDemoMode } from './supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
 // Feedback operations
@@ -11,11 +11,6 @@ export const feedbackService = {
     dateFrom?: string;
     dateTo?: string;
   } = {}) {
-    if (isDemoMode) {
-      console.log('Demo mode: Supabase not connected. Please connect to Supabase to use real data.');
-      return [];
-    }
-
     let query = supabase
       .from('feedback')
       .select('*')
@@ -47,11 +42,6 @@ export const feedbackService = {
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
-    if (isDemoMode) {
-      console.log('Demo mode: would create feedback', feedback);
-      throw new Error('Supabase not connected. Please connect to Supabase to create feedback.');
-    }
-
     const { data, error } = await supabase
       .from('feedback')
       .insert([feedback])
@@ -63,11 +53,6 @@ export const feedbackService = {
   },
 
   async update(id: string, updates: Partial<Feedback>) {
-    if (isDemoMode) {
-      console.log('Demo mode: would update feedback', id, updates);
-      throw new Error('Supabase not connected. Please connect to Supabase to update feedback.');
-    }
-
     const { data, error } = await supabase
       .from('feedback')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -80,11 +65,6 @@ export const feedbackService = {
   },
 
   async delete(id: string) {
-    if (isDemoMode) {
-      console.log('Demo mode: would delete feedback', id);
-      throw new Error('Supabase not connected. Please connect to Supabase to delete feedback.');
-    }
-
     const { error } = await supabase
       .from('feedback')
       .delete()
@@ -94,11 +74,6 @@ export const feedbackService = {
   },
 
   async getMetrics(filters: { dateRange?: string; service?: string; location?: string } = {}) {
-    if (isDemoMode) {
-      console.log('Demo mode: Supabase not connected. Please connect to Supabase to view metrics.');
-      return { total: 0, positive: 0, negative: 0, avgRating: 0, data: [] };
-    }
-
     let query = supabase.from('feedback').select('*');
     
     if (filters.service && filters.service !== 'all') {

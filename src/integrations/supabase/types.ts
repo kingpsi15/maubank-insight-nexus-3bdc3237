@@ -9,7 +9,102 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      feedback: {
+        Row: {
+          contacted_bank_person: string | null
+          created_at: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          detected_issues: string[] | null
+          id: string
+          issue_location: string | null
+          review_rating: number
+          review_text: string
+          sentiment: string | null
+          service_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          contacted_bank_person?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          detected_issues?: string[] | null
+          id?: string
+          issue_location?: string | null
+          review_rating: number
+          review_text: string
+          sentiment?: string | null
+          service_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          contacted_bank_person?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          detected_issues?: string[] | null
+          id?: string
+          issue_location?: string | null
+          review_rating?: number
+          review_text?: string
+          sentiment?: string | null
+          service_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      issues: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          category: string
+          confidence_score: number | null
+          created_at: string | null
+          description: string
+          feedback_count: number | null
+          id: string
+          resolution: string
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          category: string
+          confidence_score?: number | null
+          created_at?: string | null
+          description: string
+          feedback_count?: number | null
+          id?: string
+          resolution: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          category?: string
+          confidence_score?: number | null
+          created_at?: string | null
+          description?: string
+          feedback_count?: number | null
+          id?: string
+          resolution?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
