@@ -102,6 +102,27 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     return result;
   };
 
+  // Check if a row looks like headers or data
+  const looksLikeHeaders = (values: string[]): boolean => {
+    if (values.length < 4) return false;
+    
+    // Check if first value looks like a customer ID (numeric)
+    const firstValue = values[0]?.trim();
+    if (firstValue && /^\d+$/.test(firstValue)) {
+      console.log('First value looks like customer ID:', firstValue);
+      return false; // This looks like data, not headers
+    }
+    
+    // Check if we have typical header words
+    const headerWords = ['customer', 'name', 'phone', 'email', 'service', 'review', 'rating', 'text'];
+    const hasHeaderWords = values.some(val => 
+      headerWords.some(word => val.toLowerCase().includes(word))
+    );
+    
+    console.log('Has header words:', hasHeaderWords, 'Values:', values.slice(0, 3));
+    return hasHeaderWords;
+  };
+
   const validateFeedbackData = (data: any, rowIndex: number): string | null => {
     console.log(`Validating row ${rowIndex} data:`, data);
     
@@ -117,8 +138,8 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
       return 'Customer name is required and cannot be empty';
     }
     
-    if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking', 'Core Banking', 'Online Banking'].includes(data.serviceType)) {
-      return 'Service type must be ATM, OnlineBanking, CoreBanking, Core Banking, or Online Banking';
+    if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking', 'Core Banking', 'Online Banking', 'Core Operations'].includes(data.serviceType)) {
+      return 'Service type must be ATM, OnlineBanking, CoreBanking, Core Banking, Core Operations, or Online Banking';
     }
     
     if (!data.reviewText || data.reviewText.trim() === '') {
@@ -154,7 +175,6 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
     setProgress(0);
 
     try {
-      // Use FileReader to handle file reading more reliably
       const fileReader = new FileReader();
       
       fileReader.onload = async (event) => {
@@ -167,41 +187,70 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
           console.log('Total lines found:', lines.length);
           console.log('First 3 lines:', lines.slice(0, 3));
           
-          if (lines.length < 2) {
-            throw new Error('CSV file must contain headers and at least one data row');
+          if (lines.length < 1) {
+            throw new Error('CSV file appears to be empty');
           }
 
-          const headers = parseCSVLine(lines[0]).map(h => h.trim());
-          console.log('Headers found:', headers);
+          let hasHeaders = false;
+          let dataStartIndex = 0;
+          let headerMapping = new Map<string, string>();
+
+          // Check if first row looks like headers
+          const firstRowValues = parseCSVLine(lines[0]);
+          hasHeaders = looksLikeHeaders(firstRowValues);
           
-          // Create a more flexible header mapping
-          const headerMapping = new Map<string, string>();
-          headers.forEach((header, index) => {
-            const cleanHeader = header.toLowerCase().replace(/[^a-z]/g, '');
-            console.log(`Header ${index}: "${header}" -> cleaned: "${cleanHeader}"`);
+          console.log('Has headers:', hasHeaders);
+          console.log('First row values:', firstRowValues);
+
+          if (hasHeaders) {
+            // Process headers normally
+            const headers = firstRowValues.map(h => h.trim());
+            console.log('Headers found:', headers);
             
-            if (cleanHeader.includes('customerid') || cleanHeader.includes('custid')) {
-              headerMapping.set(index.toString(), 'CustomerId');
-            } else if (cleanHeader.includes('customername') || cleanHeader.includes('custname') || cleanHeader.includes('name')) {
-              headerMapping.set(index.toString(), 'CustomerName');
-            } else if (cleanHeader.includes('customerphone') || cleanHeader.includes('phone')) {
-              headerMapping.set(index.toString(), 'CustomerPhone');
-            } else if (cleanHeader.includes('customeremail') || cleanHeader.includes('email')) {
-              headerMapping.set(index.toString(), 'CustomerEmail');
-            } else if (cleanHeader.includes('servicetype') || cleanHeader.includes('service')) {
-              headerMapping.set(index.toString(), 'ServiceType');
-            } else if (cleanHeader.includes('reviewtext') || cleanHeader.includes('review') || cleanHeader.includes('text')) {
-              headerMapping.set(index.toString(), 'ReviewText');
-            } else if (cleanHeader.includes('reviewrating') || cleanHeader.includes('rating')) {
-              headerMapping.set(index.toString(), 'ReviewRating');
-            } else if (cleanHeader.includes('date')) {
-              headerMapping.set(index.toString(), 'Date');
-            } else if (cleanHeader.includes('issuelocation') || cleanHeader.includes('location')) {
-              headerMapping.set(index.toString(), 'IssueLocation');
-            } else if (cleanHeader.includes('contactedbankperson') || cleanHeader.includes('bankperson') || cleanHeader.includes('contacted')) {
-              headerMapping.set(index.toString(), 'ContactedBankPerson');
-            }
-          });
+            headers.forEach((header, index) => {
+              const cleanHeader = header.toLowerCase().replace(/[^a-z]/g, '');
+              console.log(`Header ${index}: "${header}" -> cleaned: "${cleanHeader}"`);
+              
+              if (cleanHeader.includes('customerid') || cleanHeader.includes('custid')) {
+                headerMapping.set(index.toString(), 'CustomerId');
+              } else if (cleanHeader.includes('customername') || cleanHeader.includes('custname') || cleanHeader.includes('name')) {
+                headerMapping.set(index.toString(), 'CustomerName');
+              } else if (cleanHeader.includes('customerphone') || cleanHeader.includes('phone')) {
+                headerMapping.set(index.toString(), 'CustomerPhone');
+              } else if (cleanHeader.includes('customeremail') || cleanHeader.includes('email')) {
+                headerMapping.set(index.toString(), 'CustomerEmail');
+              } else if (cleanHeader.includes('servicetype') || cleanHeader.includes('service')) {
+                headerMapping.set(index.toString(), 'ServiceType');
+              } else if (cleanHeader.includes('reviewtext') || cleanHeader.includes('review') && cleanHeader.includes('text')) {
+                headerMapping.set(index.toString(), 'ReviewText');
+              } else if (cleanHeader.includes('reviewrating') || cleanHeader.includes('rating')) {
+                headerMapping.set(index.toString(), 'ReviewRating');
+              } else if (cleanHeader.includes('date')) {
+                headerMapping.set(index.toString(), 'Date');
+              } else if (cleanHeader.includes('issuelocation') || cleanHeader.includes('location')) {
+                headerMapping.set(index.toString(), 'IssueLocation');
+              } else if (cleanHeader.includes('contactedbankperson') || cleanHeader.includes('bankperson') || cleanHeader.includes('contacted')) {
+                headerMapping.set(index.toString(), 'ContactedBankPerson');
+              }
+            });
+            dataStartIndex = 1;
+          } else {
+            // No headers - use default column mapping based on your Excel file structure
+            console.log('No headers detected, using default mapping');
+            headerMapping = new Map([
+              ['0', 'CustomerId'],      // Customer ID
+              ['1', 'CustomerName'],    // Customer Name  
+              ['2', 'CustomerPhone'],   // Customer Phone
+              ['3', 'CustomerEmail'],   // Customer Email
+              ['4', 'ServiceType'],     // Service Type
+              ['5', 'ReviewText'],      // Review Text
+              ['6', 'ReviewRating'],    // Review Rating
+              ['7', 'Date'],            // Date
+              ['8', 'IssueLocation'],   // Issue Location
+              ['9', 'ContactedBankPerson'] // Contacted Bank Person
+            ]);
+            dataStartIndex = 0;
+          }
 
           console.log('Header mapping:', Array.from(headerMapping.entries()));
 
@@ -211,10 +260,10 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
           const missingHeaders = requiredFields.filter(field => !mappedValues.includes(field));
           
           if (missingHeaders.length > 0) {
-            throw new Error(`Missing required columns: ${missingHeaders.join(', ')}. Found headers: ${headers.join(', ')}`);
+            throw new Error(`Missing required columns: ${missingHeaders.join(', ')}. Please ensure your CSV has the correct column order: Customer ID, Customer Name, Customer Phone, Customer Email, Service Type, Review Text, Review Rating, Date, Issue Location, Contacted Bank Person`);
           }
 
-          const dataRows = lines.slice(1);
+          const dataRows = lines.slice(dataStartIndex);
           const feedbackData: any[] = [];
           const errors: Array<{ row: number; error: string }> = [];
 
@@ -222,7 +271,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
           // Process each row
           for (let i = 0; i < dataRows.length; i++) {
-            const rowIndex = i + 2; // +2 because we skip header and arrays are 0-indexed
+            const rowIndex = i + dataStartIndex + 1; // Adjust for header and 1-based indexing
             const progress = Math.round((i / dataRows.length) * 80); // 80% for processing
             setProgress(progress);
 
@@ -236,13 +285,10 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
               }
 
               const rowData: any = {};
-              headers.forEach((header, index) => {
-                const mappedHeader = headerMapping.get(index.toString());
-                if (mappedHeader) {
-                  const value = values[index] || '';
-                  rowData[mappedHeader] = value;
-                  console.log(`Row ${rowIndex}: ${mappedHeader} = "${value}"`);
-                }
+              Array.from(headerMapping.entries()).forEach(([index, mappedHeader]) => {
+                const value = values[parseInt(index)] || '';
+                rowData[mappedHeader] = value;
+                console.log(`Row ${rowIndex}: ${mappedHeader} = "${value}"`);
               });
 
               console.log(`Row ${rowIndex} mapped data:`, rowData);
@@ -315,6 +361,10 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             description: `Successfully processed ${result.successful} out of ${result.totalRows} records.`,
           });
 
+          if (result.successful > 0) {
+            onUploadComplete();
+          }
+
         } catch (error) {
           console.error('Upload processing error:', error);
           toast({
@@ -365,13 +415,13 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-gray-600">
-            <p className="font-semibold mb-2">Required columns:</p>
+            <p className="font-semibold mb-2">Expected column order (with or without headers):</p>
             <ul className="list-disc list-inside space-y-1">
               <li>Customer ID - Unique customer identifier (optional)</li>
               <li>Customer Name - Full name of the customer (required)</li>
               <li>Customer Phone - Phone number with country code (optional)</li>
               <li>Customer Email - Valid email address (optional)</li>
-              <li>Service Type - ATM, OnlineBanking, CoreBanking, Core Banking, or Online Banking (required)</li>
+              <li>Service Type - ATM, OnlineBanking, CoreBanking, Core Banking, Core Operations, or Online Banking (required)</li>
               <li>Review Text - Customer feedback text (required)</li>
               <li>Review Rating - Rating from 1 to 5 (required)</li>
               <li>Date - Feedback date (YYYY-MM-DD format) (optional)</li>
@@ -394,7 +444,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
             Upload Feedback Data
           </CardTitle>
           <CardDescription>
-            Select a CSV file containing customer feedback data. The system will automatically detect column headers.
+            Select a CSV file containing customer feedback data. The system will automatically detect if column headers are present or use default column mapping.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
