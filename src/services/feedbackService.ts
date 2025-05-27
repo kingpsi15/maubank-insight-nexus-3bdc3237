@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
@@ -193,6 +194,8 @@ export const feedbackService = {
     dateFrom?: string;
     dateTo?: string;
   } = {}) {
+    console.log('feedbackService.getAll called with filters:', filters);
+    
     let query = supabase
       .from('feedback')
       .select('*')
@@ -207,6 +210,7 @@ export const feedbackService = {
     }
     
     if (filters.service && filters.service !== 'all') {
+      console.log('Applying service filter:', filters.service);
       query = query.eq('service_type', filters.service);
     }
     
@@ -223,12 +227,14 @@ export const feedbackService = {
       console.error('Error fetching feedback:', error);
       throw error;
     }
+    
+    console.log(`feedbackService.getAll returning ${data?.length || 0} records`);
     return data || [];
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
     try {
-      console.log('Creating feedback:', feedback);
+      console.log('feedbackService.create called with:', feedback);
       
       const { issues, resolutions } = await detectIssuesWithLLM(
         feedback.review_text, 
@@ -242,6 +248,8 @@ export const feedbackService = {
         detected_issues: issues
       };
 
+      console.log('Creating feedback record with service_type:', feedbackWithIssues.service_type);
+
       const { data, error } = await supabase
         .from('feedback')
         .insert([feedbackWithIssues])
@@ -249,9 +257,11 @@ export const feedbackService = {
         .single();
       
       if (error) {
-        console.error('Database error:', error);
+        console.error('Database error creating feedback:', error);
         throw error;
       }
+
+      console.log('Successfully created feedback record:', data.id);
 
       if (data && issues.length > 0) {
         await createPendingIssues(data.id, issues, resolutions, feedback.service_type);
@@ -259,12 +269,14 @@ export const feedbackService = {
       
       return data;
     } catch (error) {
-      console.error('Error creating feedback:', error);
+      console.error('Error in feedbackService.create:', error);
       throw error;
     }
   },
 
   async update(id: string, updates: Partial<Feedback>) {
+    console.log('feedbackService.update called for id:', id, 'with updates:', updates);
+    
     if (updates.review_text || updates.review_rating) {
       const { data: currentFeedback } = await supabase
         .from('feedback')
@@ -290,17 +302,29 @@ export const feedbackService = {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating feedback:', error);
+      throw error;
+    }
+    
+    console.log('Successfully updated feedback:', data.id);
     return data;
   },
 
   async delete(id: string) {
+    console.log('feedbackService.delete called for id:', id);
+    
     const { error } = await supabase
       .from('feedback')
       .delete()
       .eq('id', id);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error deleting feedback:', error);
+      throw error;
+    }
+    
+    console.log('Successfully deleted feedback:', id);
   },
 
   async getMetrics(filters: { 
@@ -310,10 +334,12 @@ export const feedbackService = {
     dateFrom?: string;
     dateTo?: string;
   } = {}) {
+    console.log('feedbackService.getMetrics called with filters:', filters);
+    
     let query = supabase.from('feedback').select('*');
     
     if (filters.service && filters.service !== 'all') {
-      console.log('Filtering by service:', filters.service);
+      console.log('Applying service filter in metrics:', filters.service);
       query = query.eq('service_type', filters.service);
     }
     
@@ -354,7 +380,7 @@ export const feedbackService = {
     }
 
     const feedbackData = data || [];
-    console.log('Filtered feedback data:', feedbackData.length, 'records for service:', filters.service);
+    console.log(`feedbackService.getMetrics: Fetched ${feedbackData.length} records for filters:`, filters);
     
     const total = feedbackData.length;
     const positive = feedbackData.filter(f => f.sentiment === 'positive').length;
@@ -372,7 +398,7 @@ export const feedbackService = {
     const avgRating = feedbackData.length > 0 ? 
       feedbackData.reduce((sum, f) => sum + (f.review_rating || 0), 0) / feedbackData.length : 0;
 
-    return { 
+    const metrics = { 
       total, 
       positive, 
       negative, 
@@ -384,5 +410,8 @@ export const feedbackService = {
       ratingDistribution,
       data: feedbackData 
     };
+    
+    console.log('feedbackService.getMetrics returning:', metrics);
+    return metrics;
   }
 };

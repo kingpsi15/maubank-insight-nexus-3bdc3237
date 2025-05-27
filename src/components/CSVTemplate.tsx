@@ -48,14 +48,28 @@ const CSVTemplate = () => {
   };
 
   return (
-    <Button 
-      onClick={generateTemplate} 
-      variant="outline" 
-      className="mb-4"
-    >
-      <Download className="w-4 h-4 mr-2" />
-      Download CSV Template
-    </Button>
+    <div className="space-y-4">
+      <Button 
+        onClick={generateTemplate} 
+        variant="outline" 
+        className="mb-4"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Download CSV Template
+      </Button>
+      
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h4 className="font-medium mb-2">Service Type Mapping:</h4>
+        <div className="text-sm text-gray-600 space-y-1">
+          <p><strong>ATM:</strong> Use "ATM" in the Service Type column</p>
+          <p><strong>Online Banking:</strong> Use "OnlineBanking" or "Online Banking"</p>
+          <p><strong>Core Banking:</strong> Use "CoreBanking" or "Core Banking"</p>
+          <p className="mt-2 text-blue-600">
+            Note: The system will automatically map variations (e.g., "online", "mobile", "digital" → OnlineBanking)
+          </p>
+        </div>
+      </div>
+    </div>
   );
 };
 
