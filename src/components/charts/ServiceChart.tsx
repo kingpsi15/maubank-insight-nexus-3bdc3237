@@ -1,33 +1,31 @@
 
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 const ServiceChart = () => {
-  const data = [
-    {
-      service: 'ATM',
-      positive: 645,
-      negative: 234,
-      total: 879
-    },
-    {
-      service: 'Online Banking',
-      positive: 823,
-      negative: 445,
-      total: 1268
-    },
-    {
-      service: 'Core Banking',
-      positive: 379,
-      negative: 213,
-      total: 592
-    }
-  ];
+  const { serviceData, isLoading } = useAnalytics();
+
+  if (isLoading) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-gray-500">Loading service data...</div>
+      </div>
+    );
+  }
+
+  if (!serviceData || serviceData.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-gray-500">No service data available</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <BarChart data={serviceData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="service" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} />

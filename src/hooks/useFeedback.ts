@@ -10,12 +10,15 @@ export const useFeedback = (filters: any = {}) => {
   const {
     data: feedback = [],
     isLoading,
-    error
+    error,
+    refetch
   } = useQuery({
     queryKey: ['feedback', filters],
     queryFn: () => feedbackService.getAll(filters),
     staleTime: 0,
     gcTime: 0, // Don't cache results to ensure fresh data
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const invalidateAllFeedbackQueries = () => {
@@ -29,6 +32,9 @@ export const useFeedback = (filters: any = {}) => {
     queryClient.removeQueries({ queryKey: ['feedback'] });
     queryClient.removeQueries({ queryKey: ['feedback-metrics'] });
     queryClient.removeQueries({ queryKey: ['analytics'] });
+    
+    // Force refetch of current query
+    refetch();
   };
 
   const createFeedbackMutation = useMutation({
@@ -102,6 +108,7 @@ export const useFeedback = (filters: any = {}) => {
     isCreating: createFeedbackMutation.isPending,
     isUpdating: updateFeedbackMutation.isPending,
     isDeleting: deleteFeedbackMutation.isPending,
+    refetch,
   };
 };
 
@@ -114,5 +121,7 @@ export const useFeedbackMetrics = (filters: any = {}) => {
     },
     staleTime: 0,
     gcTime: 0, // Don't cache to ensure fresh data
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 };

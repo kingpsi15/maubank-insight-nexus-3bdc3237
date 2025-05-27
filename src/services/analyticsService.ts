@@ -1,11 +1,13 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Analytics operations
 export const analyticsService = {
   async getSentimentData(filters: any = {}) {
+    console.log('analyticsService.getSentimentData called with filters:', filters);
+    
     let query = supabase.from('feedback').select('sentiment');
     
+    // Apply the same filtering logic as metrics
     if (filters.service && filters.service !== 'all') {
       query = query.eq('service_type', filters.service);
     }
@@ -14,78 +16,208 @@ export const analyticsService = {
       query = query.eq('issue_location', filters.location);
     }
 
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      
+      query = query.gte('created_at', startDate.toISOString());
+    }
+
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching sentiment data:', error);
+      return [];
+    }
 
-    const sentimentCounts = (data || []).reduce((acc: any, item) => {
-      const sentiment = item.sentiment || 'neutral';
-      acc[sentiment] = (acc[sentiment] || 0) + 1;
-      return acc;
-    }, {});
+    // Process sentiment data
+    const sentimentCounts = {
+      positive: 0,
+      negative: 0,
+      neutral: 0
+    };
 
+    data?.forEach(item => {
+      if (item.sentiment === 'positive') sentimentCounts.positive++;
+      else if (item.sentiment === 'negative') sentimentCounts.negative++;
+      else sentimentCounts.neutral++;
+    });
+
+    console.log('getSentimentData returning:', sentimentCounts);
     return [
-      { name: 'Positive', value: sentimentCounts.positive || 0, color: '#10B981' },
-      { name: 'Negative', value: sentimentCounts.negative || 0, color: '#EF4444' },
-      { name: 'Neutral', value: sentimentCounts.neutral || 0, color: '#6B7280' }
+      { name: 'Positive', value: sentimentCounts.positive, fill: '#10B981' },
+      { name: 'Negative', value: sentimentCounts.negative, fill: '#EF4444' },
+      { name: 'Neutral', value: sentimentCounts.neutral, fill: '#6B7280' }
     ];
   },
 
   async getServiceData(filters: any = {}) {
+    console.log('analyticsService.getServiceData called with filters:', filters);
+    
     let query = supabase.from('feedback').select('service_type, sentiment');
     
+    // Apply location and date filters but NOT service filter since we want to see all services
     if (filters.location && filters.location !== 'all') {
       query = query.eq('issue_location', filters.location);
     }
 
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      
+      query = query.gte('created_at', startDate.toISOString());
+    }
+
     const { data, error } = await query;
-    if (error) throw error;
-    
-    const services = ['ATM', 'OnlineBanking', 'CoreBanking'];
-    return services.map(service => {
-      const serviceData = (data || []).filter(f => f.service_type === service);
-      return {
-        service,
-        positive: serviceData.filter(f => f.sentiment === 'positive').length,
-        negative: serviceData.filter(f => f.sentiment === 'negative').length,
-        total: serviceData.length
-      };
+    if (error) {
+      console.error('Error fetching service data:', error);
+      return [];
+    }
+
+    // Process service data by sentiment
+    const serviceData: { [key: string]: { positive: number, negative: number, total: number } } = {};
+
+    data?.forEach(item => {
+      const service = item.service_type || 'Unknown';
+      if (!serviceData[service]) {
+        serviceData[service] = { positive: 0, negative: 0, total: 0 };
+      }
+      
+      serviceData[service].total++;
+      if (item.sentiment === 'positive') {
+        serviceData[service].positive++;
+      } else if (item.sentiment === 'negative') {
+        serviceData[service].negative++;
+      }
     });
+
+    const result = Object.entries(serviceData).map(([service, data]) => ({
+      service,
+      positive: data.positive,
+      negative: data.negative,
+      total: data.total
+    }));
+
+    console.log('getServiceData returning:', result);
+    return result;
   },
 
   async getLocationData(filters: any = {}) {
-    let query = supabase.from('feedback').select('issue_location, sentiment, review_rating');
+    console.log('analyticsService.getLocationData called with filters:', filters);
     
+    let query = supabase.from('feedback').select('issue_location, sentiment');
+    
+    // Apply service and date filters but NOT location filter since we want to see all locations
     if (filters.service && filters.service !== 'all') {
       query = query.eq('service_type', filters.service);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    
-    const locationStats = (data || []).reduce((acc: any, feedback) => {
-      const location = feedback.issue_location || 'Unknown';
-      if (!acc[location]) {
-        acc[location] = { location, positive: 0, negative: 0, total: 0, ratings: [] };
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       }
       
-      acc[location].total++;
-      acc[location].ratings.push(feedback.review_rating);
-      
-      if (feedback.sentiment === 'positive') acc[location].positive++;
-      if (feedback.sentiment === 'negative') acc[location].negative++;
-      
-      return acc;
-    }, {});
+      query = query.gte('created_at', startDate.toISOString());
+    }
 
-    return Object.values(locationStats).map((loc: any) => ({
-      ...loc,
-      avgRating: loc.ratings.length > 0 ? loc.ratings.reduce((a: number, b: number) => a + b, 0) / loc.ratings.length : 0
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching location data:', error);
+      return [];
+    }
+
+    // Process location data
+    const locationData: { [key: string]: { positive: number, negative: number, total: number } } = {};
+
+    data?.forEach(item => {
+      const location = item.issue_location || 'Unknown';
+      if (!locationData[location]) {
+        locationData[location] = { positive: 0, negative: 0, total: 0 };
+      }
+      
+      locationData[location].total++;
+      if (item.sentiment === 'positive') {
+        locationData[location].positive++;
+      } else if (item.sentiment === 'negative') {
+        locationData[location].negative++;
+      }
+    });
+
+    const result = Object.entries(locationData).map(([location, data]) => ({
+      location,
+      positive: data.positive,
+      negative: data.negative,
+      total: data.total
     }));
+
+    console.log('getLocationData returning:', result);
+    return result;
   },
 
   async getRatingDistribution(filters: any = {}) {
+    console.log('analyticsService.getRatingDistribution called with filters:', filters);
+    
     let query = supabase.from('feedback').select('review_rating');
     
+    // Apply all filters
     if (filters.service && filters.service !== 'all') {
       query = query.eq('service_type', filters.service);
     }
@@ -94,21 +226,64 @@ export const analyticsService = {
       query = query.eq('issue_location', filters.location);
     }
 
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      
+      query = query.gte('created_at', startDate.toISOString());
+    }
+
     const { data, error } = await query;
-    if (error) throw error;
-    
-    const ratingCounts = [1, 2, 3, 4, 5].map(rating => ({
-      rating: rating.toString(),
-      count: (data || []).filter(f => f.review_rating === rating).length,
-      label: ['Very Poor', 'Poor', 'Average', 'Good', 'Excellent'][rating - 1]
+    if (error) {
+      console.error('Error fetching rating distribution:', error);
+      return [];
+    }
+
+    // Process rating distribution
+    const ratingCounts: { [key: number]: number } = {};
+    [0, 1, 2, 3, 4, 5].forEach(rating => ratingCounts[rating] = 0);
+
+    data?.forEach(item => {
+      const rating = item.review_rating || 0;
+      ratingCounts[rating]++;
+    });
+
+    const result = Object.entries(ratingCounts).map(([rating, count]) => ({
+      rating: `${rating} Stars`,
+      count: count,
+      fill: rating === '5' ? '#10B981' : rating === '4' ? '#3B82F6' : rating === '3' ? '#F59E0B' : rating === '2' ? '#F97316' : '#EF4444'
     }));
 
-    return ratingCounts;
+    console.log('getRatingDistribution returning:', result);
+    return result;
   },
 
   async getTimelineData(filters: any = {}) {
-    let query = supabase.from('feedback').select('created_at, sentiment, review_rating');
+    console.log('analyticsService.getTimelineData called with filters:', filters);
     
+    let query = supabase.from('feedback').select('created_at, sentiment');
+    
+    // Apply all filters
     if (filters.service && filters.service !== 'all') {
       query = query.eq('service_type', filters.service);
     }
@@ -117,35 +292,68 @@ export const analyticsService = {
       query = query.eq('issue_location', filters.location);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    
-    const monthlyData = (data || []).reduce((acc: any, feedback) => {
-      const month = new Date(feedback.created_at).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short' 
-      });
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
       
-      if (!acc[month]) {
-        acc[month] = { month, positive: 0, negative: 0, ratings: [] };
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       }
       
-      acc[month].ratings.push(feedback.review_rating);
-      if (feedback.sentiment === 'positive') acc[month].positive++;
-      if (feedback.sentiment === 'negative') acc[month].negative++;
-      
-      return acc;
-    }, {});
+      query = query.gte('created_at', startDate.toISOString());
+    }
 
-    return Object.values(monthlyData).map((month: any) => ({
-      ...month,
-      avgRating: month.ratings.length > 0 ? month.ratings.reduce((a: number, b: number) => a + b, 0) / month.ratings.length : 0
-    }));
+    const { data, error } = await query.order('created_at', { ascending: true });
+    if (error) {
+      console.error('Error fetching timeline data:', error);
+      return [];
+    }
+
+    // Group by date and sentiment
+    const timelineData: { [key: string]: { positive: number, negative: number, neutral: number, date: string } } = {};
+
+    data?.forEach(item => {
+      const date = new Date(item.created_at).toDateString();
+      if (!timelineData[date]) {
+        timelineData[date] = { positive: 0, negative: 0, neutral: 0, date };
+      }
+      
+      if (item.sentiment === 'positive') {
+        timelineData[date].positive++;
+      } else if (item.sentiment === 'negative') {
+        timelineData[date].negative++;
+      } else {
+        timelineData[date].neutral++;
+      }
+    });
+
+    const result = Object.values(timelineData);
+    console.log('getTimelineData returning:', result);
+    return result;
   },
 
   async getTopIssues(filters: any = {}) {
+    console.log('analyticsService.getTopIssues called with filters:', filters);
+    
     let query = supabase.from('feedback').select('detected_issues, service_type');
     
+    // Apply all filters
     if (filters.service && filters.service !== 'all') {
       query = query.eq('service_type', filters.service);
     }
@@ -154,22 +362,58 @@ export const analyticsService = {
       query = query.eq('issue_location', filters.location);
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    
-    const issueCounts = (data || []).reduce((acc: any, feedback) => {
-      const issues = feedback.detected_issues || [];
-      issues.forEach((issue: string) => {
-        if (!acc[issue]) {
-          acc[issue] = { issue, count: 0, service: feedback.service_type };
-        }
-        acc[issue].count++;
-      });
-      return acc;
-    }, {});
+    // Apply date filters
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      
+      switch (filters.dateRange) {
+        case 'last_week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_month':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_quarter':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last_year':
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      
+      query = query.gte('created_at', startDate.toISOString());
+    }
 
-    return Object.values(issueCounts)
-      .sort((a: any, b: any) => b.count - a.count)
-      .slice(0, 8);
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching issues data:', error);
+      return [];
+    }
+
+    // Count issues frequency
+    const issueCount: { [key: string]: number } = {};
+
+    data?.forEach(item => {
+      if (item.detected_issues && Array.isArray(item.detected_issues)) {
+        item.detected_issues.forEach((issue: string) => {
+          if (issue && issue.trim()) {
+            issueCount[issue] = (issueCount[issue] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    const result = Object.entries(issueCount)
+      .map(([issue, count]) => ({ issue, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10 issues
+
+    console.log('getTopIssues returning:', result);
+    return result;
   }
 };

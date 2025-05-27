@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
@@ -201,6 +200,7 @@ export const feedbackService = {
       .select('*')
       .order('created_at', { ascending: false });
 
+    // Remove any limits to get all data
     if (filters.search) {
       query = query.or(`customer_name.ilike.%${filters.search}%,review_text.ilike.%${filters.search}%`);
     }
@@ -222,7 +222,7 @@ export const feedbackService = {
       query = query.lte('created_at', filters.dateTo);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) {
       console.error('Error fetching feedback:', error);
       throw error;
@@ -333,23 +333,30 @@ export const feedbackService = {
     location?: string;
     dateFrom?: string;
     dateTo?: string;
+    customDateFrom?: string;
+    customDateTo?: string;
   } = {}) {
     console.log('feedbackService.getMetrics called with filters:', filters);
     
     let query = supabase.from('feedback').select('*');
     
+    // Apply service filter properly
     if (filters.service && filters.service !== 'all') {
       console.log('Applying service filter in metrics:', filters.service);
       query = query.eq('service_type', filters.service);
     }
     
+    // Apply location filter
     if (filters.location && filters.location !== 'all') {
       query = query.eq('issue_location', filters.location);
     }
 
-    if (filters.dateFrom && filters.dateTo) {
+    // Apply date filters with proper precedence
+    if (filters.customDateFrom && filters.customDateTo) {
+      query = query.gte('created_at', filters.customDateFrom).lte('created_at', filters.customDateTo);
+    } else if (filters.dateFrom && filters.dateTo) {
       query = query.gte('created_at', filters.dateFrom).lte('created_at', filters.dateTo);
-    } else if (filters.dateRange) {
+    } else if (filters.dateRange && filters.dateRange !== 'all') {
       const now = new Date();
       let startDate: Date;
       
