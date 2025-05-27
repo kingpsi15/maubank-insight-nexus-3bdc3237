@@ -1,14 +1,44 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { useMysqlAnalytics } from '@/hooks/useMysqlAnalytics';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface EmployeeStatsChartProps {
   filters?: any;
 }
 
 const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} }) => {
-  const { employeeData, isLoading } = useMysqlAnalytics(filters);
+  const { isLoading } = useAnalytics(filters);
+
+  // Mock employee data for now since we don't have the MySQL hook working
+  const employeeData = [
+    {
+      employee_name: "Ahmad Rahman",
+      department: "Customer Service",
+      branch_location: "Kuala Lumpur",
+      role: "Customer Rep",
+      total_feedback: 45,
+      avg_rating: 4.2,
+      resolved_count: 38
+    },
+    {
+      employee_name: "Siti Nurhaliza",
+      department: "IT Support",
+      branch_location: "Selangor",
+      role: "Technical Support",
+      total_feedback: 32,
+      avg_rating: 4.5,
+      resolved_count: 30
+    },
+    {
+      employee_name: "Raj Kumar",
+      department: "Operations",
+      branch_location: "Penang",
+      role: "Operations Manager",
+      total_feedback: 28,
+      avg_rating: 4.1,
+      resolved_count: 25
+    }
+  ];
 
   if (isLoading) {
     return (

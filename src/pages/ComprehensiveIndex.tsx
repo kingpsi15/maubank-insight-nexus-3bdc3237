@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ComprehensiveDashboard from '@/components/ComprehensiveDashboard';
@@ -8,14 +7,14 @@ import BankEmployeeAnalytics from '@/components/BankEmployeeAnalytics';
 import DatabaseInitializer from '@/components/DatabaseInitializer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, MessageSquare, Users, CheckCircle, Database, Settings } from 'lucide-react';
-import { useMysqlFeedbackMetrics } from '@/hooks/useMysqlFeedback';
+import { useFeedbackMetrics } from '@/hooks/useFeedback';
 import { Button } from "@/components/ui/button";
 
 const ComprehensiveIndex = () => {
   const [showDbInit, setShowDbInit] = useState(false);
   
-  // Get real metrics from MySQL database
-  const { data: overallMetrics, isLoading } = useMysqlFeedbackMetrics({});
+  // Get real metrics from database
+  const { data: overallMetrics, isLoading } = useFeedbackMetrics({});
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -71,7 +70,7 @@ const ComprehensiveIndex = () => {
               <div className="text-3xl font-bold">
                 {isLoading ? "Loading..." : overallMetrics?.total || 0}
               </div>
-              <p className="text-green-100 text-sm mt-1">From MySQL Database</p>
+              <p className="text-green-100 text-sm mt-1">From Database</p>
               <div className="mt-2 text-xs">
                 <span className="bg-green-400/20 px-2 py-1 rounded">Live Data</span>
               </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Users, Star, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useMysqlFeedbackMetrics } from '@/hooks/useMysqlFeedback';
-import { useMysqlAnalytics } from '@/hooks/useMysqlAnalytics';
+import { useFeedbackMetrics } from '@/hooks/useFeedback';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import MySqlSentimentChart from '@/components/charts/MySqlSentimentChart';
 import MySqlServiceChart from '@/components/charts/MySqlServiceChart';
 import IssuesChart from '@/components/charts/IssuesChart';
@@ -32,12 +31,12 @@ const ComprehensiveDashboard = () => {
     customDateTo: customDateTo?.toISOString()
   };
 
-  const { data: overallMetrics, isLoading } = useMysqlFeedbackMetrics(filters);
+  const { data: overallMetrics, isLoading } = useFeedbackMetrics(filters);
   
   // Service-specific metrics
-  const { data: atmMetrics } = useMysqlFeedbackMetrics({ ...filters, service: 'ATM' });
-  const { data: coreBankingMetrics } = useMysqlFeedbackMetrics({ ...filters, service: 'CoreBanking' });
-  const { data: onlineBankingMetrics } = useMysqlFeedbackMetrics({ ...filters, service: 'OnlineBanking' });
+  const { data: atmMetrics } = useFeedbackMetrics({ ...filters, service: 'ATM' });
+  const { data: coreBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'CoreBanking' });
+  const { data: onlineBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'OnlineBanking' });
 
   // Analytics data
   const {
@@ -47,9 +46,8 @@ const ComprehensiveDashboard = () => {
     ratingData,
     timelineData,
     issuesData,
-    employeeData,
     isLoading: analyticsLoading
-  } = useMysqlAnalytics(filters);
+  } = useAnalytics(filters);
 
   const handleExportCSV = () => {
     console.log('Exporting CSV with filters:', filters);
