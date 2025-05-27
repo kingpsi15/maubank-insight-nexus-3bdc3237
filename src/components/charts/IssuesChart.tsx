@@ -97,7 +97,7 @@ const IssuesChart = () => {
         </div>
       </div>
 
-      {/* Chart - Changed to vertical layout */}
+      {/* Chart - Fixed vertical layout */}
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
@@ -107,9 +107,10 @@ const IssuesChart = () => {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="issue" 
-              tick={{ fontSize: 10, angle: -45, textAnchor: 'end' }}
+              tick={{ fontSize: 10, textAnchor: 'end' }}
               height={100}
               interval={0}
+              angle={-45}
             />
             <YAxis 
               tick={{ fontSize: 12 }}
