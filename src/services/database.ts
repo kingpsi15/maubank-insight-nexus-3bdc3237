@@ -1,10 +1,19 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Fallback to demo mode if environment variables are not set
+const demoUrl = 'https://demo.supabase.co';
+const demoKey = 'demo-key';
+
+export const supabase = createClient(
+  supabaseUrl || demoUrl, 
+  supabaseKey || demoKey
+);
+
+// Check if we're in demo mode
+export const isDemoMode = !supabaseUrl || !supabaseKey;
 
 // Database types
 export interface Feedback {
@@ -39,6 +48,38 @@ export interface Issue {
   updated_at: string;
 }
 
+// Mock data for demo mode
+const mockFeedback = [
+  {
+    id: '1',
+    customer_name: 'John Doe',
+    customer_email: 'john@example.com',
+    service_type: 'ATM' as const,
+    review_text: 'ATM was out of order',
+    review_rating: 2,
+    issue_location: 'Kuala Lumpur',
+    status: 'new' as const,
+    sentiment: 'negative' as const,
+    detected_issues: ['Hardware Issue'],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    customer_name: 'Jane Smith',
+    customer_email: 'jane@example.com',
+    service_type: 'OnlineBanking' as const,
+    review_text: 'Great online banking experience',
+    review_rating: 5,
+    issue_location: 'Selangor',
+    status: 'resolved' as const,
+    sentiment: 'positive' as const,
+    detected_issues: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
 // Feedback operations
 export const feedbackService = {
   async getAll(filters: {
@@ -48,6 +89,11 @@ export const feedbackService = {
     dateFrom?: string;
     dateTo?: string;
   } = {}) {
+    if (isDemoMode) {
+      console.log('Demo mode: returning mock feedback data');
+      return mockFeedback;
+    }
+
     let query = supabase
       .from('feedback')
       .select('*')
@@ -79,6 +125,11 @@ export const feedbackService = {
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
+    if (isDemoMode) {
+      console.log('Demo mode: would create feedback', feedback);
+      return { ...feedback, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    }
+
     const { data, error } = await supabase
       .from('feedback')
       .insert([feedback])
@@ -90,6 +141,11 @@ export const feedbackService = {
   },
 
   async update(id: string, updates: Partial<Feedback>) {
+    if (isDemoMode) {
+      console.log('Demo mode: would update feedback', id, updates);
+      return { ...mockFeedback[0], ...updates };
+    }
+
     const { data, error } = await supabase
       .from('feedback')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -102,6 +158,11 @@ export const feedbackService = {
   },
 
   async delete(id: string) {
+    if (isDemoMode) {
+      console.log('Demo mode: would delete feedback', id);
+      return;
+    }
+
     const { error } = await supabase
       .from('feedback')
       .delete()
@@ -111,6 +172,15 @@ export const feedbackService = {
   },
 
   async getMetrics(filters: { dateRange?: string; service?: string; location?: string } = {}) {
+    if (isDemoMode) {
+      const data = mockFeedback;
+      const total = data.length;
+      const positive = data.filter(f => f.sentiment === 'positive').length;
+      const negative = data.filter(f => f.sentiment === 'negative').length;
+      const avgRating = data.length > 0 ? data.reduce((sum, f) => sum + f.review_rating, 0) / data.length : 0;
+      return { total, positive, negative, avgRating, data };
+    }
+
     let query = supabase.from('feedback').select('*');
     
     if (filters.service && filters.service !== 'all') {
@@ -121,7 +191,6 @@ export const feedbackService = {
       query = query.eq('issue_location', filters.location);
     }
 
-    // Apply date range filter
     if (filters.dateRange) {
       const now = new Date();
       let startDate: Date;
@@ -149,7 +218,6 @@ export const feedbackService = {
     const { data, error } = await query;
     if (error) throw error;
 
-    // Calculate metrics
     const total = data.length;
     const positive = data.filter(f => f.sentiment === 'positive').length;
     const negative = data.filter(f => f.sentiment === 'negative').length;
@@ -162,6 +230,11 @@ export const feedbackService = {
 // Issue operations
 export const issueService = {
   async getAll(status?: string) {
+    if (isDemoMode) {
+      console.log('Demo mode: returning mock issues');
+      return [];
+    }
+
     let query = supabase
       .from('issues')
       .select('*')
@@ -177,6 +250,11 @@ export const issueService = {
   },
 
   async create(issue: Omit<Issue, 'id' | 'created_at' | 'updated_at'>) {
+    if (isDemoMode) {
+      console.log('Demo mode: would create issue', issue);
+      return { ...issue, id: Date.now().toString(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    }
+
     const { data, error } = await supabase
       .from('issues')
       .insert([issue])
@@ -188,6 +266,11 @@ export const issueService = {
   },
 
   async update(id: string, updates: Partial<Issue>) {
+    if (isDemoMode) {
+      console.log('Demo mode: would update issue', id, updates);
+      return updates;
+    }
+
     const { data, error } = await supabase
       .from('issues')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -200,6 +283,11 @@ export const issueService = {
   },
 
   async approve(id: string, approvedBy: string, resolution?: string) {
+    if (isDemoMode) {
+      console.log('Demo mode: would approve issue', id);
+      return {};
+    }
+
     const updates: Partial<Issue> = {
       status: 'approved',
       approved_by: approvedBy,
@@ -223,6 +311,11 @@ export const issueService = {
   },
 
   async reject(id: string) {
+    if (isDemoMode) {
+      console.log('Demo mode: would reject issue', id);
+      return {};
+    }
+
     const { data, error } = await supabase
       .from('issues')
       .update({ 
@@ -303,7 +396,6 @@ export const analyticsService = {
   async getTimelineData(filters: any = {}) {
     const { data } = await feedbackService.getMetrics(filters);
     
-    // Group by month
     const monthlyData = data.reduce((acc: any, feedback) => {
       const month = new Date(feedback.created_at).toLocaleDateString('en-US', { 
         year: 'numeric', 
@@ -330,7 +422,6 @@ export const analyticsService = {
   async getTopIssues(filters: any = {}) {
     const { data } = await feedbackService.getMetrics(filters);
     
-    // Count issues by type
     const issueCounts = data.reduce((acc: any, feedback) => {
       feedback.detected_issues.forEach((issue: string) => {
         if (!acc[issue]) {

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +8,7 @@ import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useFeedbackMetrics } from '@/hooks/useFeedback';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import SentimentChart from '@/components/charts/SentimentChart';
 import ServiceChart from '@/components/charts/ServiceChart';
 import LocationChart from '@/components/charts/LocationChart';
@@ -37,6 +37,17 @@ const Dashboard = () => {
   const { data: atmMetrics } = useFeedbackMetrics({ ...filters, service: 'ATM' });
   const { data: coreBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'CoreBanking' });
   const { data: onlineBankingMetrics } = useFeedbackMetrics({ ...filters, service: 'OnlineBanking' });
+
+  // Get analytics data using the useAnalytics hook
+  const {
+    sentimentData,
+    serviceData,
+    locationData,
+    ratingData,
+    timelineData,
+    issuesData,
+    isLoading: analyticsLoading
+  } = useAnalytics(filters);
 
   const handleExportCSV = () => {
     // Export functionality based on current filters
@@ -285,7 +296,11 @@ const Dashboard = () => {
             <CardDescription>Customer sentiment breakdown across all feedback</CardDescription>
           </CardHeader>
           <CardContent>
-            <SentimentChart filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <SentimentChart />
+            )}
           </CardContent>
         </Card>
 
@@ -296,7 +311,11 @@ const Dashboard = () => {
             <CardDescription>Distribution of customer ratings (0-5 scale)</CardDescription>
           </CardHeader>
           <CardContent>
-            <RatingDistribution filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <RatingDistribution />
+            )}
           </CardContent>
         </Card>
 
@@ -307,7 +326,11 @@ const Dashboard = () => {
             <CardDescription>Sentiment breakdown by service type</CardDescription>
           </CardHeader>
           <CardContent>
-            <ServiceChart filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <ServiceChart />
+            )}
           </CardContent>
         </Card>
 
@@ -318,7 +341,11 @@ const Dashboard = () => {
             <CardDescription>Regional sentiment and issue distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <LocationChart filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <LocationChart />
+            )}
           </CardContent>
         </Card>
 
@@ -329,7 +356,11 @@ const Dashboard = () => {
             <CardDescription>Sentiment trends over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <TimelineChart filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <TimelineChart />
+            )}
           </CardContent>
         </Card>
 
@@ -340,7 +371,11 @@ const Dashboard = () => {
             <CardDescription>Most common issues across all services</CardDescription>
           </CardHeader>
           <CardContent>
-            <IssuesChart filters={filters} />
+            {analyticsLoading ? (
+              <div className="h-64 flex items-center justify-center">Loading...</div>
+            ) : (
+              <IssuesChart />
+            )}
           </CardContent>
         </Card>
       </div>
