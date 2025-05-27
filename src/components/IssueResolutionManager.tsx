@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +37,7 @@ interface ExistingIssue {
   title: string;
   category: string;
   description: string;
+  feedback_count: number;
 }
 
 const IssueResolutionManager = () => {
@@ -83,7 +83,7 @@ const IssueResolutionManager = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('issues')
-        .select('id, title, category, description')
+        .select('id, title, category, description, feedback_count')
         .eq('status', 'approved');
 
       if (error) throw error;
@@ -140,11 +140,13 @@ const IssueResolutionManager = () => {
       try {
         const existingIssue = existingIssues.find(ei => ei.id === selectedExistingIssue);
         
-        // Update existing issue feedback count
+        // Update existing issue feedback count by incrementing it
+        const newFeedbackCount = (existingIssue?.feedback_count || 0) + 1;
         const { error: updateError } = await supabase
           .from('issues')
           .update({ 
-            feedback_count: supabase.rpc('increment_feedback_count', { issue_id: selectedExistingIssue })
+            feedback_count: newFeedbackCount,
+            updated_at: new Date().toISOString()
           })
           .eq('id', selectedExistingIssue);
 
