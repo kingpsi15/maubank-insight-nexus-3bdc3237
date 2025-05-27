@@ -1,14 +1,14 @@
 
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useMysqlAnalytics } from '@/hooks/useMysqlAnalytics';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface MySqlServiceChartProps {
   filters?: any;
 }
 
 const MySqlServiceChart: React.FC<MySqlServiceChartProps> = ({ filters = {} }) => {
-  const { serviceData, isLoading } = useMysqlAnalytics(filters);
+  const { serviceData, isLoading } = useAnalytics(filters);
 
   if (isLoading) {
     return (

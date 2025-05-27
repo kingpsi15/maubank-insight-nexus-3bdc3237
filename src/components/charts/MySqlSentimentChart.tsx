@@ -1,14 +1,14 @@
 
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { useMysqlAnalytics } from '@/hooks/useMysqlAnalytics';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface MySqlSentimentChartProps {
   filters?: any;
 }
 
 const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} }) => {
-  const { sentimentData, isLoading } = useMysqlAnalytics(filters);
+  const { sentimentData, isLoading } = useAnalytics(filters);
 
   if (isLoading) {
     return (

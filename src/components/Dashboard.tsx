@@ -10,7 +10,6 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useFeedbackMetrics } from '@/hooks/useFeedback';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { supabase } from '@/integrations/supabase/client';
 import SentimentChart from '@/components/charts/SentimentChart';
 import ServiceChart from '@/components/charts/ServiceChart';
 import LocationChart from '@/components/charts/LocationChart';
@@ -313,7 +312,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <SentimentChart />
+              <SentimentChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -328,7 +327,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <RatingDistribution />
+              <RatingDistribution filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -343,7 +342,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <ServiceChart />
+              <ServiceChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -358,7 +357,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <LocationChart />
+              <LocationChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -373,7 +372,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <TimelineChart />
+              <TimelineChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -388,7 +387,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <IssuesChart />
+              <IssuesChart filters={filters} />
             )}
           </CardContent>
         </Card>
