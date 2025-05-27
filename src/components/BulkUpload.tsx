@@ -26,58 +26,94 @@ const BulkUpload = () => {
   const { toast } = useToast();
   const { createFeedback } = useFeedback();
 
-  // Improved column mapping with more flexible matching
+  // Enhanced column mapping with more flexible matching
   const getColumnMapping = (headers: string[]) => {
     const mapping: { [key: string]: string } = {};
     
     headers.forEach(header => {
       const normalizedHeader = header.toLowerCase().trim();
+      console.log('Mapping header:', header, 'normalized:', normalizedHeader);
       
-      // Customer Name variations
-      if (normalizedHeader.includes('customer') && normalizedHeader.includes('name')) {
+      // Customer Name variations - more flexible matching
+      if ((normalizedHeader.includes('customer') && normalizedHeader.includes('name')) ||
+          normalizedHeader.includes('cust') && normalizedHeader.includes('name') ||
+          normalizedHeader === 'name' ||
+          normalizedHeader === 'customer' ||
+          normalizedHeader.includes('client') && normalizedHeader.includes('name')) {
         mapping[header] = 'customer_name';
+        console.log('Mapped', header, 'to customer_name');
       }
       // Customer ID variations
-      else if (normalizedHeader.includes('customer') && normalizedHeader.includes('id')) {
+      else if ((normalizedHeader.includes('customer') && normalizedHeader.includes('id')) ||
+               normalizedHeader.includes('cust') && normalizedHeader.includes('id') ||
+               normalizedHeader === 'id' ||
+               normalizedHeader === 'customer_id') {
         mapping[header] = 'customer_id';
+        console.log('Mapped', header, 'to customer_id');
       }
       // Phone variations
-      else if (normalizedHeader.includes('phone') || normalizedHeader.includes('mobile') || normalizedHeader.includes('contact')) {
+      else if (normalizedHeader.includes('phone') || 
+               normalizedHeader.includes('mobile') || 
+               normalizedHeader.includes('contact') ||
+               normalizedHeader.includes('tel')) {
         mapping[header] = 'customer_phone';
+        console.log('Mapped', header, 'to customer_phone');
       }
       // Email variations
       else if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
         mapping[header] = 'customer_email';
+        console.log('Mapped', header, 'to customer_email');
       }
       // Service Type variations
-      else if (normalizedHeader.includes('service') && normalizedHeader.includes('type')) {
+      else if ((normalizedHeader.includes('service') && normalizedHeader.includes('type')) ||
+               normalizedHeader === 'service' ||
+               normalizedHeader.includes('product')) {
         mapping[header] = 'service_type';
+        console.log('Mapped', header, 'to service_type');
       }
-      // Review Text variations
-      else if (normalizedHeader.includes('review') && normalizedHeader.includes('text')) {
+      // Review Text variations - more flexible
+      else if ((normalizedHeader.includes('review') && normalizedHeader.includes('text')) ||
+               normalizedHeader.includes('feedback') ||
+               normalizedHeader.includes('comment') ||
+               normalizedHeader.includes('description') ||
+               normalizedHeader === 'review' ||
+               normalizedHeader === 'text') {
         mapping[header] = 'review_text';
+        console.log('Mapped', header, 'to review_text');
       }
       // Rating variations
-      else if (normalizedHeader.includes('rating') || normalizedHeader.includes('review') && normalizedHeader.includes('rating')) {
+      else if (normalizedHeader.includes('rating') || 
+               (normalizedHeader.includes('review') && normalizedHeader.includes('rating')) ||
+               normalizedHeader === 'score') {
         mapping[header] = 'review_rating';
+        console.log('Mapped', header, 'to review_rating');
       }
       // Location variations
-      else if (normalizedHeader.includes('location') || normalizedHeader.includes('issue') && normalizedHeader.includes('location')) {
+      else if (normalizedHeader.includes('location') || 
+               (normalizedHeader.includes('issue') && normalizedHeader.includes('location')) ||
+               normalizedHeader.includes('branch') ||
+               normalizedHeader.includes('place')) {
         mapping[header] = 'issue_location';
+        console.log('Mapped', header, 'to issue_location');
       }
       // Bank Contact variations
-      else if (normalizedHeader.includes('bank') && normalizedHeader.includes('contact')) {
+      else if ((normalizedHeader.includes('bank') && normalizedHeader.includes('contact')) ||
+               (normalizedHeader.includes('contacted') && normalizedHeader.includes('bank')) ||
+               normalizedHeader.includes('employee') ||
+               normalizedHeader.includes('staff')) {
         mapping[header] = 'contacted_bank_person';
-      }
-      else if (normalizedHeader.includes('contacted') && normalizedHeader.includes('bank')) {
-        mapping[header] = 'contacted_bank_person';
+        console.log('Mapped', header, 'to contacted_bank_person');
       }
       // Date variations
-      else if (normalizedHeader.includes('date') || normalizedHeader.includes('created')) {
+      else if (normalizedHeader.includes('date') || 
+               normalizedHeader.includes('created') ||
+               normalizedHeader.includes('time')) {
         mapping[header] = 'created_at';
+        console.log('Mapped', header, 'to created_at');
       }
     });
     
+    console.log('Final column mapping:', mapping);
     return mapping;
   };
 
@@ -140,6 +176,8 @@ const BulkUpload = () => {
         }
       });
 
+      console.log('Row', rowIndex + 1, 'mapped data:', mappedRow);
+
       // Ensure required fields with better error messages
       if (!mappedRow.customer_name || mappedRow.customer_name.trim() === '') {
         throw new Error(`Customer name is required but missing in row ${rowIndex + 1}`);
@@ -170,14 +208,24 @@ const BulkUpload = () => {
   };
 
   const processBatch = async (batch: any[]) => {
-    const batchPromises = batch.map(feedback => 
-      createFeedback(feedback).catch(error => {
+    // Process each feedback item in the batch sequentially
+    for (const feedback of batch) {
+      try {
+        // Since createFeedback returns void, we need to wrap it in a promise
+        await new Promise<void>((resolve, reject) => {
+          try {
+            createFeedback(feedback);
+            // Give it a small delay to complete
+            setTimeout(() => resolve(), 100);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      } catch (error) {
         console.error('Error creating feedback:', error);
         throw error;
-      })
-    );
-    
-    await Promise.allSettled(batchPromises);
+      }
+    }
   };
 
   const processFile = async () => {
@@ -205,8 +253,8 @@ const BulkUpload = () => {
       const stats = { total: rows.length, processed: 0, errors: 0 };
       setUploadStats({ ...stats });
 
-      // Process in smaller batches
-      const batchSize = 5;
+      // Process in smaller batches to avoid overwhelming the system
+      const batchSize = 3;
       const totalBatches = Math.ceil(rows.length / batchSize);
 
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -232,6 +280,7 @@ const BulkUpload = () => {
           try {
             await processBatch(feedbackBatch);
             stats.processed += feedbackBatch.length;
+            console.log(`Successfully processed batch ${batchIndex + 1}/${totalBatches}`);
           } catch (error) {
             console.error('Error uploading batch:', error);
             stats.errors += feedbackBatch.length;
@@ -244,7 +293,7 @@ const BulkUpload = () => {
         setUploadStats({ ...stats });
 
         // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       toast({
@@ -297,7 +346,7 @@ const BulkUpload = () => {
           <span>Upload Feedback Data</span>
         </CardTitle>
         <CardDescription>
-          Select a CSV file containing customer feedback data. The system will automatically detect column headers and map them appropriately.
+          Select a CSV file containing customer feedback data. The system will automatically detect if column headers are present or use default column mapping.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
