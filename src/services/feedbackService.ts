@@ -1,51 +1,194 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
-// Simple issue detection based on keywords and sentiment
-const detectIssues = (reviewText: string, sentiment: string, rating: number): string[] => {
+// Enhanced issue detection using LLM
+const detectIssuesWithLLM = async (reviewText: string, sentiment: string, rating: number, serviceType: string): Promise<{ issues: string[], resolutions: string[] }> => {
+  try {
+    // Use Hugging Face Inference API (free tier)
+    const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: `Analyze this customer feedback for banking service issues and suggest resolutions:
+        
+Service: ${serviceType}
+Rating: ${rating}/5
+Sentiment: ${sentiment}
+Feedback: "${reviewText}"
+
+Please identify specific issues and suggest practical resolutions. Format as:
+ISSUES: [list issues]
+RESOLUTIONS: [list corresponding resolutions]`,
+        parameters: {
+          max_length: 200,
+          temperature: 0.3
+        }
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      // Parse LLM response (fallback to keyword detection if parsing fails)
+      return parseLLMResponse(result[0]?.generated_text || '', reviewText, sentiment, rating, serviceType);
+    }
+  } catch (error) {
+    console.log('LLM detection failed, using keyword detection:', error);
+  }
+  
+  // Fallback to keyword-based detection
+  return detectIssuesKeywordBased(reviewText, sentiment, rating, serviceType);
+};
+
+const parseLLMResponse = (llmResponse: string, reviewText: string, sentiment: string, rating: number, serviceType: string) => {
+  try {
+    const issues: string[] = [];
+    const resolutions: string[] = [];
+    
+    // Try to extract issues and resolutions from LLM response
+    const issuesMatch = llmResponse.match(/ISSUES:\s*(.+?)(?=RESOLUTIONS:|$)/s);
+    const resolutionsMatch = llmResponse.match(/RESOLUTIONS:\s*(.+)$/s);
+    
+    if (issuesMatch) {
+      const issuesList = issuesMatch[1].split(/[,\n\-]/).map(i => i.trim()).filter(i => i.length > 0);
+      issues.push(...issuesList);
+    }
+    
+    if (resolutionsMatch) {
+      const resolutionsList = resolutionsMatch[1].split(/[,\n\-]/).map(r => r.trim()).filter(r => r.length > 0);
+      resolutions.push(...resolutionsList);
+    }
+    
+    // If LLM didn't provide good results, fall back to keyword detection
+    if (issues.length === 0) {
+      return detectIssuesKeywordBased(reviewText, sentiment, rating, serviceType);
+    }
+    
+    return { issues, resolutions };
+  } catch (error) {
+    console.log('Failed to parse LLM response, using keyword detection');
+    return detectIssuesKeywordBased(reviewText, sentiment, rating, serviceType);
+  }
+};
+
+const detectIssuesKeywordBased = (reviewText: string, sentiment: string, rating: number, serviceType: string) => {
   const issues: string[] = [];
+  const resolutions: string[] = [];
   const text = reviewText.toLowerCase();
   
   // ATM related issues
   if (text.includes('atm') && (text.includes('not working') || text.includes('broken') || text.includes('down') || text.includes('error'))) {
-    issues.push('ATM malfunction');
+    issues.push('ATM malfunction - machine not responding or displaying errors');
+    resolutions.push('Check ATM maintenance log, restart machine if needed, and arrange for technical support. Provide alternative ATM locations to customer.');
+  }
+  
+  if (text.includes('card') && (text.includes('stuck') || text.includes('trapped'))) {
+    issues.push('Card stuck in ATM machine');
+    resolutions.push('Contact customer immediately to verify card status, arrange card replacement, check ATM for mechanical issues, and initiate refund if transaction was incomplete.');
   }
   
   // Card issues
   if (text.includes('card') && (text.includes('blocked') || text.includes('not working') || text.includes('declined'))) {
-    issues.push('Card issues');
+    issues.push('Card transaction declined or blocked');
+    resolutions.push('Verify customer account status, check for card expiry or damage, unlock card if blocked due to security, and guide customer through card replacement process if needed.');
+  }
+  
+  // Online/Mobile banking issues
+  if ((text.includes('app') || text.includes('online') || text.includes('mobile')) && 
+      (text.includes('crash') || text.includes('not working') || text.includes('error') || text.includes('slow'))) {
+    issues.push('Mobile/Online banking application issues');
+    resolutions.push('Guide customer to update app to latest version, clear cache and data, check internet connection, and reinstall app if problem persists. Escalate to IT team for server-side issues.');
+  }
+  
+  if (text.includes('login') && (text.includes('fail') || text.includes('not work') || text.includes('cannot'))) {
+    issues.push('Login authentication failure');
+    resolutions.push('Reset customer password, verify security questions, enable two-factor authentication, and provide step-by-step login guidance. Check for account lockout and unlock if necessary.');
+  }
+  
+  // Transaction issues
+  if (text.includes('transaction') && (text.includes('delay') || text.includes('slow') || text.includes('pending'))) {
+    issues.push('Transaction processing delays');
+    resolutions.push('Investigate transaction status in core banking system, check for system delays, provide transaction reference for tracking, and escalate to operations team if needed.');
   }
   
   // Service issues
   if (text.includes('service') && (text.includes('poor') || text.includes('bad') || text.includes('slow'))) {
-    issues.push('Poor customer service');
-  }
-  
-  // Charges issues
-  if (text.includes('charge') && (text.includes('hidden') || text.includes('extra') || text.includes('unexpected'))) {
-    issues.push('Unexpected charges');
-  }
-  
-  // App/Online banking issues
-  if ((text.includes('app') || text.includes('online') || text.includes('mobile')) && 
-      (text.includes('crash') || text.includes('not working') || text.includes('error') || text.includes('slow'))) {
-    issues.push('Mobile/Online banking issues');
+    issues.push('Poor customer service experience');
+    resolutions.push('Schedule follow-up call with customer, provide service recovery gesture, conduct staff retraining if needed, and implement service improvement measures.');
   }
   
   // Branch issues
   if (text.includes('branch') && (text.includes('closed') || text.includes('long queue') || text.includes('wait'))) {
-    issues.push('Branch service issues');
+    issues.push('Branch service accessibility issues');
+    resolutions.push('Provide alternative branch locations, implement queue management system, extend operating hours if feasible, and promote digital banking alternatives.');
   }
   
-  // General negative sentiment issues
-  if (sentiment === 'negative' && rating <= 2) {
-    if (issues.length === 0) {
-      issues.push('General service dissatisfaction');
+  // Charges issues
+  if (text.includes('charge') && (text.includes('hidden') || text.includes('extra') || text.includes('unexpected'))) {
+    issues.push('Unexpected or unclear charges');
+    resolutions.push('Review customer account for unauthorized charges, provide detailed fee breakdown, process refund if charges are incorrect, and improve fee transparency communication.');
+  }
+  
+  // General negative sentiment
+  if (sentiment === 'negative' && rating <= 2 && issues.length === 0) {
+    issues.push('General service dissatisfaction');
+    resolutions.push('Contact customer for detailed feedback, conduct service review, implement corrective measures, and follow up to ensure satisfaction.');
+  }
+  
+  return { issues, resolutions };
+};
+
+// Create pending issues from detected issues
+const createPendingIssues = async (feedbackId: string, detectedIssues: string[], suggestedResolutions: string[], serviceType: string) => {
+  for (let i = 0; i < detectedIssues.length; i++) {
+    const issue = detectedIssues[i];
+    const resolution = suggestedResolutions[i] || 'Manual review required for appropriate resolution.';
+    
+    // Check if similar pending issue already exists
+    const { data: existingIssues } = await supabase
+      .from('pending_issues')
+      .select('id, feedback_count')
+      .ilike('title', `%${issue.substring(0, 20)}%`)
+      .eq('category', serviceType);
+    
+    if (existingIssues && existingIssues.length > 0) {
+      // Update existing issue feedback count
+      const existingIssue = existingIssues[0];
+      await supabase
+        .from('pending_issues')
+        .update({ 
+          feedback_count: existingIssue.feedback_count + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingIssue.id);
+    } else {
+      // Create new pending issue
+      const { data: pendingIssue } = await supabase
+        .from('pending_issues')
+        .insert({
+          title: issue,
+          description: `Issue detected from customer feedback: ${issue}`,
+          category: serviceType,
+          confidence_score: 0.8,
+          feedback_count: 1,
+          detected_from_feedback_id: feedbackId
+        })
+        .select()
+        .single();
+      
+      // Create pending resolution
+      if (pendingIssue) {
+        await supabase
+          .from('pending_resolutions')
+          .insert({
+            pending_issue_id: pendingIssue.id,
+            resolution_text: resolution,
+            confidence_score: 0.75
+          });
+      }
     }
   }
-  
-  return issues;
 };
 
 // Feedback operations
@@ -88,12 +231,17 @@ export const feedbackService = {
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
-    // Auto-detect issues before creating
-    const detectedIssues = detectIssues(feedback.review_text, feedback.sentiment || 'neutral', feedback.review_rating);
+    // Auto-detect issues using LLM + keyword detection
+    const { issues, resolutions } = await detectIssuesWithLLM(
+      feedback.review_text, 
+      feedback.sentiment || 'neutral', 
+      feedback.review_rating,
+      feedback.service_type
+    );
     
     const feedbackWithIssues = {
       ...feedback,
-      detected_issues: detectedIssues
+      detected_issues: issues
     };
 
     const { data, error } = await supabase
@@ -103,25 +251,59 @@ export const feedbackService = {
       .single();
     
     if (error) throw error;
+
+    // Create pending issues for the detected issues
+    if (data && issues.length > 0) {
+      await createPendingIssues(data.id, issues, resolutions, feedback.service_type);
+    }
+    
     return data;
   },
 
   async bulkCreate(feedbackList: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>[]) {
-    // Auto-detect issues for all feedback entries
-    const feedbackWithIssues = feedbackList.map(feedback => {
-      const detectedIssues = detectIssues(feedback.review_text, feedback.sentiment || 'neutral', feedback.review_rating);
-      return {
+    const processedFeedback = [];
+    
+    for (const feedback of feedbackList) {
+      // Auto-detect issues for each feedback entry
+      const { issues, resolutions } = await detectIssuesWithLLM(
+        feedback.review_text, 
+        feedback.sentiment || 'neutral', 
+        feedback.review_rating,
+        feedback.service_type
+      );
+      
+      processedFeedback.push({
         ...feedback,
-        detected_issues: detectedIssues
-      };
-    });
+        detected_issues: issues
+      });
+    }
 
     const { data, error } = await supabase
       .from('feedback')
-      .insert(feedbackWithIssues)
+      .insert(processedFeedback)
       .select();
     
     if (error) throw error;
+
+    // Create pending issues for all detected issues
+    if (data) {
+      for (let i = 0; i < data.length; i++) {
+        const feedbackData = data[i];
+        const originalFeedback = feedbackList[i];
+        
+        if (feedbackData.detected_issues && feedbackData.detected_issues.length > 0) {
+          const { issues, resolutions } = await detectIssuesWithLLM(
+            originalFeedback.review_text, 
+            originalFeedback.sentiment || 'neutral', 
+            originalFeedback.review_rating,
+            originalFeedback.service_type
+          );
+          
+          await createPendingIssues(feedbackData.id, issues, resolutions, originalFeedback.service_type);
+        }
+      }
+    }
+    
     return data || [];
   },
 
@@ -130,7 +312,7 @@ export const feedbackService = {
     if (updates.review_text || updates.review_rating) {
       const { data: currentFeedback } = await supabase
         .from('feedback')
-        .select('review_text, sentiment, review_rating')
+        .select('review_text, sentiment, review_rating, service_type')
         .eq('id', id)
         .single();
       
@@ -138,9 +320,10 @@ export const feedbackService = {
         const reviewText = updates.review_text || currentFeedback.review_text;
         const sentiment = updates.sentiment || currentFeedback.sentiment || 'neutral';
         const rating = updates.review_rating || currentFeedback.review_rating;
+        const serviceType = currentFeedback.service_type;
         
-        const detectedIssues = detectIssues(reviewText, sentiment, rating);
-        updates.detected_issues = detectedIssues;
+        const { issues } = await detectIssuesWithLLM(reviewText, sentiment, rating, serviceType);
+        updates.detected_issues = issues;
       }
     }
 
