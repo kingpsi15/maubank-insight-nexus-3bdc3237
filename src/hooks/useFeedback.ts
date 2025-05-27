@@ -14,16 +14,13 @@ export const useFeedback = (filters: any = {}) => {
   } = useQuery({
     queryKey: ['feedback', filters],
     queryFn: () => feedbackService.getAll(filters),
+    staleTime: 0,
   });
 
   const invalidateAllFeedbackQueries = () => {
-    // Invalidate all feedback-related queries
     queryClient.invalidateQueries({ queryKey: ['feedback'] });
     queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
     queryClient.invalidateQueries({ queryKey: ['analytics'] });
-    // Force refetch for immediate updates
-    queryClient.refetchQueries({ queryKey: ['feedback'] });
-    queryClient.refetchQueries({ queryKey: ['feedback-metrics'] });
   };
 
   const createFeedbackMutation = useMutation({
@@ -36,6 +33,7 @@ export const useFeedback = (filters: any = {}) => {
       });
     },
     onError: (error: any) => {
+      console.error('Create feedback error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create feedback",
@@ -101,7 +99,7 @@ export const useFeedbackMetrics = (filters: any = {}) => {
       console.log('Fetching metrics with filters:', filters);
       return feedbackService.getMetrics(filters);
     },
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache results
+    staleTime: 0,
+    gcTime: 0,
   });
 };

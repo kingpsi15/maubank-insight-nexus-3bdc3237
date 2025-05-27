@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
@@ -31,14 +30,12 @@ RESOLUTIONS: [list corresponding resolutions]`,
 
     if (response.ok) {
       const result = await response.json();
-      // Parse LLM response (fallback to keyword detection if parsing fails)
       return parseLLMResponse(result[0]?.generated_text || '', reviewText, sentiment, rating, serviceType);
     }
   } catch (error) {
     console.log('LLM detection failed, using keyword detection:', error);
   }
   
-  // Fallback to keyword-based detection
   return detectIssuesKeywordBased(reviewText, sentiment, rating, serviceType);
 };
 
@@ -140,13 +137,11 @@ const detectIssuesKeywordBased = (reviewText: string, sentiment: string, rating:
   return { issues, resolutions };
 };
 
-// Create pending issues from detected issues
 const createPendingIssues = async (feedbackId: string, detectedIssues: string[], suggestedResolutions: string[], serviceType: string) => {
   for (let i = 0; i < detectedIssues.length; i++) {
     const issue = detectedIssues[i];
     const resolution = suggestedResolutions[i] || 'Manual review required for appropriate resolution.';
     
-    // Check if similar pending issue already exists
     const { data: existingIssues } = await supabase
       .from('pending_issues')
       .select('id, feedback_count')
@@ -154,7 +149,6 @@ const createPendingIssues = async (feedbackId: string, detectedIssues: string[],
       .eq('category', serviceType);
     
     if (existingIssues && existingIssues.length > 0) {
-      // Update existing issue feedback count
       const existingIssue = existingIssues[0];
       await supabase
         .from('pending_issues')
@@ -164,7 +158,6 @@ const createPendingIssues = async (feedbackId: string, detectedIssues: string[],
         })
         .eq('id', existingIssue.id);
     } else {
-      // Create new pending issue
       const { data: pendingIssue } = await supabase
         .from('pending_issues')
         .insert({
@@ -178,7 +171,6 @@ const createPendingIssues = async (feedbackId: string, detectedIssues: string[],
         .select()
         .single();
       
-      // Create pending resolution
       if (pendingIssue) {
         await supabase
           .from('pending_resolutions')
@@ -227,45 +219,17 @@ export const feedbackService = {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching feedback:', error);
+      throw error;
+    }
     return data || [];
   },
 
   async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
-    // Auto-detect issues using LLM + keyword detection
-    const { issues, resolutions } = await detectIssuesWithLLM(
-      feedback.review_text, 
-      feedback.sentiment || 'neutral', 
-      feedback.review_rating,
-      feedback.service_type
-    );
-    
-    const feedbackWithIssues = {
-      ...feedback,
-      detected_issues: issues
-    };
-
-    const { data, error } = await supabase
-      .from('feedback')
-      .insert([feedbackWithIssues])
-      .select()
-      .single();
-    
-    if (error) throw error;
-
-    // Create pending issues for the detected issues
-    if (data && issues.length > 0) {
-      await createPendingIssues(data.id, issues, resolutions, feedback.service_type);
-    }
-    
-    return data;
-  },
-
-  async bulkCreate(feedbackList: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>[]) {
-    const processedFeedback = [];
-    
-    for (const feedback of feedbackList) {
-      // Auto-detect issues for each feedback entry
+    try {
+      console.log('Creating feedback:', feedback);
+      
       const { issues, resolutions } = await detectIssuesWithLLM(
         feedback.review_text, 
         feedback.sentiment || 'neutral', 
@@ -273,43 +237,34 @@ export const feedbackService = {
         feedback.service_type
       );
       
-      processedFeedback.push({
+      const feedbackWithIssues = {
         ...feedback,
         detected_issues: issues
-      });
-    }
+      };
 
-    const { data, error } = await supabase
-      .from('feedback')
-      .insert(processedFeedback)
-      .select();
-    
-    if (error) throw error;
-
-    // Create pending issues for all detected issues
-    if (data) {
-      for (let i = 0; i < data.length; i++) {
-        const feedbackData = data[i];
-        const originalFeedback = feedbackList[i];
-        
-        if (feedbackData.detected_issues && feedbackData.detected_issues.length > 0) {
-          const { issues, resolutions } = await detectIssuesWithLLM(
-            originalFeedback.review_text, 
-            originalFeedback.sentiment || 'neutral', 
-            originalFeedback.review_rating,
-            originalFeedback.service_type
-          );
-          
-          await createPendingIssues(feedbackData.id, issues, resolutions, originalFeedback.service_type);
-        }
+      const { data, error } = await supabase
+        .from('feedback')
+        .insert([feedbackWithIssues])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
       }
+
+      if (data && issues.length > 0) {
+        await createPendingIssues(data.id, issues, resolutions, feedback.service_type);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error creating feedback:', error);
+      throw error;
     }
-    
-    return data || [];
   },
 
   async update(id: string, updates: Partial<Feedback>) {
-    // Re-detect issues if review text or rating changed
     if (updates.review_text || updates.review_rating) {
       const { data: currentFeedback } = await supabase
         .from('feedback')
@@ -357,7 +312,6 @@ export const feedbackService = {
   } = {}) {
     let query = supabase.from('feedback').select('*');
     
-    // Apply service filter FIRST - this is the key fix
     if (filters.service && filters.service !== 'all') {
       console.log('Filtering by service:', filters.service);
       query = query.eq('service_type', filters.service);
@@ -367,7 +321,6 @@ export const feedbackService = {
       query = query.eq('issue_location', filters.location);
     }
 
-    // Handle custom date range
     if (filters.dateFrom && filters.dateTo) {
       query = query.gte('created_at', filters.dateFrom).lte('created_at', filters.dateTo);
     } else if (filters.dateRange) {
@@ -411,7 +364,6 @@ export const feedbackService = {
     const pending = feedbackData.filter(f => f.status === 'new' || f.status === 'in_progress').length;
     const escalated = feedbackData.filter(f => f.status === 'escalated').length;
     
-    // Calculate rating distribution including 0 ratings
     const ratingDistribution = [0, 1, 2, 3, 4, 5].map(rating => ({
       rating,
       count: feedbackData.filter(f => f.review_rating === rating).length

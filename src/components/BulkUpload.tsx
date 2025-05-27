@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,6 @@ const BulkUpload = () => {
     if (!serviceType) return 'ATM';
     
     const normalizedService = serviceType.toLowerCase().trim();
-    console.log('Mapping service type:', serviceType, 'normalized:', normalizedService);
     
     if (normalizedService.includes('core') || 
         normalizedService.includes('operations') ||
@@ -57,7 +57,6 @@ const BulkUpload = () => {
     const lines = csvText.split('\n').filter(line => line.trim());
     if (lines.length === 0) return { headers: [], rows: [] };
 
-    // Parse CSV line handling quotes properly
     const parseCSVLine = (line: string): string[] => {
       const result = [];
       let current = '';
@@ -80,18 +79,45 @@ const BulkUpload = () => {
       return result;
     };
 
-    // Always treat first line as headers
-    const headers = parseCSVLine(lines[0]);
-    console.log('CSV Headers detected:', headers);
+    // Parse first line
+    const firstLineValues = parseCSVLine(lines[0]);
     
-    const rows: CSVRow[] = [];
+    // Define expected headers and their position-based mapping
+    const expectedHeaders = [
+      'Review Rating', 'Customer ID', 'Customer Name', 'Customer Phone', 
+      'Customer Email', 'Service Type', 'Review Text', 'Date', 
+      'Issue Location', 'Contacted Bank Person'
+    ];
 
-    // Parse data rows starting from line 2
-    for (let i = 1; i < lines.length; i++) {
+    let headers: string[];
+    let dataStartIndex: number;
+
+    // Check if first line contains headers or data
+    const hasHeaders = firstLineValues.some(value => 
+      expectedHeaders.some(header => 
+        header.toLowerCase().includes(value.toLowerCase()) || 
+        value.toLowerCase().includes(header.toLowerCase())
+      )
+    );
+
+    if (hasHeaders) {
+      headers = firstLineValues;
+      dataStartIndex = 1;
+    } else {
+      // Use position-based mapping
+      headers = expectedHeaders.slice(0, firstLineValues.length);
+      dataStartIndex = 0;
+    }
+
+    console.log('Detected headers:', headers);
+    console.log('Has header row:', hasHeaders);
+    console.log('Data starts at index:', dataStartIndex);
+
+    const rows: CSVRow[] = [];
+    for (let i = dataStartIndex; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
       const row: CSVRow = {};
       
-      // Map each value to its corresponding header
       headers.forEach((header, index) => {
         row[header] = values[index] || '';
       });
@@ -99,81 +125,87 @@ const BulkUpload = () => {
       rows.push(row);
     }
 
-    console.log('Parsed', rows.length, 'data rows');
-    console.log('Sample row:', rows[0]);
     return { headers, rows };
   };
 
   const mapRowToFeedback = (row: CSVRow, headers: string[], rowIndex: number): Omit<Feedback, 'id' | 'created_at' | 'updated_at'> => {
     try {
-      console.log(`Processing row ${rowIndex + 1}:`, row);
-      console.log('Available headers:', headers);
-
-      // Flexible header mapping - check for exact matches first, then partial matches
+      // Enhanced field mapping with multiple possible names
       const getFieldValue = (possibleNames: string[]): string => {
-        // First try exact matches
         for (const name of possibleNames) {
-          if (row[name] !== undefined) {
-            return row[name] || '';
+          if (row[name] !== undefined && row[name] !== null) {
+            return String(row[name]).trim();
           }
         }
         
-        // Then try case-insensitive partial matches
+        // Try partial matches
         for (const name of possibleNames) {
           const found = Object.keys(row).find(key => 
             key.toLowerCase().includes(name.toLowerCase()) ||
             name.toLowerCase().includes(key.toLowerCase())
           );
           if (found && row[found]) {
-            return row[found];
+            return String(row[found]).trim();
           }
         }
         
         return '';
       };
 
-      // Map fields using flexible matching
-      const customerName = getFieldValue(['Customer Name', 'customer_name', 'name', 'Customer', 'customer']);
-      const reviewText = getFieldValue(['Review Text', 'review_text', 'review', 'feedback', 'comment', 'text']);
-      const ratingStr = getFieldValue(['Review Rating', 'review_rating', 'rating', 'score']);
-      const serviceType = getFieldValue(['Service Type', 'service_type', 'service', 'type']);
-      
-      console.log('Mapped values:', {
+      // Map all fields with comprehensive name variations
+      const customerName = getFieldValue(['Customer Name', 'customer_name', 'name', 'Customer', 'customer', 'Name']);
+      const reviewText = getFieldValue(['Review Text', 'review_text', 'review', 'feedback', 'comment', 'text', 'Review', 'Feedback']);
+      const ratingStr = getFieldValue(['Review Rating', 'review_rating', 'rating', 'score', 'Rating']);
+      const serviceType = getFieldValue(['Service Type', 'service_type', 'service', 'type', 'Service']);
+      const customerId = getFieldValue(['Customer ID', 'customer_id', 'id', 'ID', 'cust_id']);
+      const customerPhone = getFieldValue(['Customer Phone', 'customer_phone', 'phone', 'Phone', 'mobile']);
+      const customerEmail = getFieldValue(['Customer Email', 'customer_email', 'email', 'Email']);
+      const issueLocation = getFieldValue(['Issue Location', 'issue_location', 'location', 'Location', 'branch']);
+      const contactedPerson = getFieldValue(['Contacted Bank Person', 'contacted_bank_person', 'bank_person', 'employee', 'Employee']);
+
+      console.log(`Row ${rowIndex + 1} mapped values:`, {
         customerName,
-        reviewText,
+        reviewText: reviewText.substring(0, 50) + '...',
         rating: ratingStr,
         serviceType
       });
 
       // Validate required fields
-      if (!customerName || customerName.trim() === '') {
-        console.error('Missing customer name in row:', row);
+      if (!customerName) {
         throw new Error(`Customer name is required`);
       }
       
-      if (!reviewText || reviewText.trim() === '') {
+      if (!reviewText) {
         throw new Error(`Review text is required`);
       }
 
-      const rating = parseInt(ratingStr) || 0;
+      // Parse and validate rating
+      let rating = 0;
+      if (ratingStr) {
+        const parsedRating = parseInt(ratingStr);
+        if (!isNaN(parsedRating) && parsedRating >= 0 && parsedRating <= 5) {
+          rating = parsedRating;
+        }
+      }
+
       const mappedServiceType = getServiceTypeMapping(serviceType);
 
       return {
-        customer_name: customerName.trim(),
-        customer_id: getFieldValue(['Customer ID', 'customer_id', 'id']) || null,
-        customer_phone: getFieldValue(['Customer Phone', 'customer_phone', 'phone']) || null,
-        customer_email: getFieldValue(['Customer Email', 'customer_email', 'email']) || null,
+        customer_name: customerName,
+        customer_id: customerId || null,
+        customer_phone: customerPhone || null,
+        customer_email: customerEmail || null,
         service_type: mappedServiceType,
-        review_text: reviewText.trim(),
+        review_text: reviewText,
         review_rating: rating,
-        issue_location: getFieldValue(['Issue Location', 'issue_location', 'location']) || null,
-        contacted_bank_person: getFieldValue(['Contacted Bank Person', 'contacted_bank_person', 'bank_person', 'employee']) || null,
+        issue_location: issueLocation || null,
+        contacted_bank_person: contactedPerson || null,
         status: 'new' as const,
         sentiment: 'neutral' as const,
         detected_issues: [],
       };
     } catch (error) {
-      console.error('Error processing row:', error, 'Row data:', row);
+      console.error(`Error processing row ${rowIndex + 1}:`, error);
       throw new Error(`Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Invalid data'}`);
     }
   };
@@ -194,50 +226,41 @@ const BulkUpload = () => {
         throw new Error('No valid data found in CSV file');
       }
 
-      console.log('Starting processing with headers:', headers);
-      console.log('Sample row:', rows[0]);
+      console.log('Processing', rows.length, 'rows with headers:', headers);
 
       const stats = { total: rows.length, processed: 0, errors: 0 };
       const errors: string[] = [];
       setUploadStats({ ...stats });
 
-      // Process rows in batches for better performance
-      const batchSize = 10;
+      // Process rows in smaller batches
+      const batchSize = 5;
       for (let i = 0; i < rows.length; i += batchSize) {
         const batch = rows.slice(i, i + batchSize);
         
-        await Promise.allSettled(
-          batch.map(async (row, batchIndex) => {
-            const rowIndex = i + batchIndex;
-            try {
-              const feedback = mapRowToFeedback(row, headers, rowIndex);
-              await new Promise<void>((resolve, reject) => {
-                try {
-                  createFeedback(feedback);
-                  setTimeout(() => resolve(), 10); // Small delay to prevent overwhelming
-                } catch (error) {
-                  reject(error);
-                }
-              });
-              
-              stats.processed++;
-            } catch (error) {
-              const errorMsg = `Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
-              console.error('Processing error:', errorMsg);
-              errors.push(errorMsg);
-              stats.errors++;
-            }
-          })
-        );
+        for (let j = 0; j < batch.length; j++) {
+          const row = batch[j];
+          const rowIndex = i + j;
+          
+          try {
+            const feedback = mapRowToFeedback(row, headers, rowIndex);
+            createFeedback(feedback);
+            stats.processed++;
+          } catch (error) {
+            const errorMsg = `Row ${rowIndex + 1}: ${error instanceof Error ? error.message : 'Processing failed'}`;
+            console.error('Processing error:', errorMsg);
+            errors.push(errorMsg);
+            stats.errors++;
+          }
+        }
 
-        // Update progress every batch
+        // Update progress
         const progressPercent = Math.round(((i + batch.length) / rows.length) * 100);
         setProgress(progressPercent);
         setUploadStats({ ...stats });
-        setErrorDetails([...errors.slice(0, 20)]); // Show only first 20 errors
+        setErrorDetails([...errors.slice(0, 10)]);
         
         // Small delay between batches
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
 
       toast({
@@ -309,7 +332,7 @@ const BulkUpload = () => {
               className="max-w-sm mx-auto"
             />
             <p className="text-sm text-gray-500 mt-2">
-              Drag and drop your CSV file here, or click to browse
+              Select your CSV file to upload
             </p>
           </div>
         ) : (
@@ -361,11 +384,11 @@ const BulkUpload = () => {
               <div className="max-h-40 overflow-y-auto bg-red-50 p-3 rounded-lg">
                 <h4 className="font-medium text-red-800 mb-2">Error Details:</h4>
                 <div className="space-y-1">
-                  {errorDetails.slice(0, 10).map((error, index) => (
+                  {errorDetails.slice(0, 5).map((error, index) => (
                     <p key={index} className="text-xs text-red-600">{error}</p>
                   ))}
-                  {errorDetails.length > 10 && (
-                    <p className="text-xs text-red-600">... and {errorDetails.length - 10} more errors</p>
+                  {errorDetails.length > 5 && (
+                    <p className="text-xs text-red-600">... and {errorDetails.length - 5} more errors</p>
                   )}
                 </div>
               </div>
@@ -392,18 +415,12 @@ const BulkUpload = () => {
         )}
 
         <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium mb-2">Expected CSV Format:</h4>
+          <h4 className="font-medium mb-2">CSV Format Requirements:</h4>
           <div className="text-sm text-gray-600 space-y-1">
-            <Badge variant="outline" className="mr-2">Customer Name (Required)</Badge>
-            <Badge variant="outline" className="mr-2">Review Text (Required)</Badge>
-            <Badge variant="outline" className="mr-2">Review Rating</Badge>
-            <Badge variant="outline" className="mr-2">Service Type</Badge>
-            <p className="mt-2 text-xs">
-              Optional: Customer ID, Customer Phone, Customer Email, Issue Location, Contacted Bank Person, Date
-            </p>
-            <p className="mt-2 text-xs font-medium">
-              Note: First row must contain column headers. Download the template above for the exact format.
-            </p>
+            <p>• Customer Name and Review Text are required</p>
+            <p>• Rating should be between 0-5</p>
+            <p>• Service Type: ATM, Online Banking, or Core Banking</p>
+            <p>• First row can be headers or data (auto-detected)</p>
           </div>
         </div>
       </CardContent>

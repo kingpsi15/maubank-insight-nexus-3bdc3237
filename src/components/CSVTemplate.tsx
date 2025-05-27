@@ -18,7 +18,24 @@ const CSVTemplate = () => {
       'Contacted Bank Person'
     ];
     
-    const csvContent = headers.join(',') + '\n';
+    const sampleData = [
+      '5',
+      'CUST001',
+      'John Doe',
+      '+60-12-3456789',
+      'john.doe@email.com',
+      'ATM',
+      'Great service, very satisfied with the ATM experience.',
+      '2024-01-15',
+      'Kuala Lumpur',
+      'Sarah Ahmad'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      sampleData.join(',')
+    ].join('\n');
+    
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
