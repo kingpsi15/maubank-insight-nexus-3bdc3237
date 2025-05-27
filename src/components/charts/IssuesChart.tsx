@@ -44,10 +44,10 @@ const IssuesChart = () => {
       
       return (
         <div className="bg-white p-3 border rounded-lg shadow-lg max-w-xs">
-          <p className="font-medium text-gray-900 mb-2">{label}</p>
+          <p className="font-medium text-gray-900 mb-2">{data.issue}</p>
           <div className="space-y-1">
             <p className="text-sm text-blue-600">
-              <span className="font-medium">Feedback Count:</span> {payload[0].value}
+              <span className="font-medium">Feedback Count:</span> {data.count}
             </p>
             <p className="text-sm text-green-600">
               <span className="font-medium">Frequency:</span> {percentage}% of total
@@ -97,24 +97,26 @@ const IssuesChart = () => {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="h-80">
+      {/* Chart - Changed to vertical layout */}
+      <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={issuesData} 
-            margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-            layout="horizontal"
+            margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" tick={{ fontSize: 12 }} />
-            <YAxis 
-              type="category"
+            <XAxis 
               dataKey="issue" 
-              tick={{ fontSize: 10 }}
-              width={150}
+              tick={{ fontSize: 10, angle: -45, textAnchor: 'end' }}
+              height={100}
+              interval={0}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              label={{ value: 'Feedback Count', angle: -90, position: 'insideLeft' }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count">
+            <Bar dataKey="count" name="Feedback Count">
               {issuesData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={getBarColor(index)} />
               ))}
