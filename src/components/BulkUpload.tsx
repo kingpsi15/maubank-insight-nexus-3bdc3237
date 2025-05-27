@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -124,34 +123,28 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
   };
 
   const validateFeedbackData = (data: any, rowIndex: number): string | null => {
-    console.log(`Validating row ${rowIndex} data:`, data);
+    console.log(`Validating row ${rowIndex} feedback data:`, data);
     
-    // Customer name validation with detailed logging
-    if (!data.customerName) {
-      console.log(`Row ${rowIndex}: customerName is missing or falsy:`, data.customerName);
+    // Customer name validation - check the actual property from the feedback object
+    if (!data.customer_name || data.customer_name.trim() === '') {
+      console.log(`Row ${rowIndex}: customer_name is missing or empty:`, data.customer_name);
       return 'Customer name is required and cannot be empty';
     }
     
-    const trimmedName = data.customerName.toString().trim();
-    if (trimmedName === '' || trimmedName === 'undefined' || trimmedName === 'null') {
-      console.log(`Row ${rowIndex}: customerName is empty after trimming:`, trimmedName);
-      return 'Customer name is required and cannot be empty';
+    if (!data.service_type || !['ATM', 'OnlineBanking', 'CoreBanking'].includes(data.service_type)) {
+      return 'Service type must be ATM, OnlineBanking, or CoreBanking';
     }
     
-    if (!data.serviceType || !['ATM', 'OnlineBanking', 'CoreBanking', 'Core Banking', 'Online Banking', 'Core Operations'].includes(data.serviceType)) {
-      return 'Service type must be ATM, OnlineBanking, CoreBanking, Core Banking, Core Operations, or Online Banking';
-    }
-    
-    if (!data.reviewText || data.reviewText.trim() === '') {
+    if (!data.review_text || data.review_text.trim() === '') {
       return 'Review text is required';
     }
     
-    const rating = parseInt(data.reviewRating);
-    if (isNaN(rating) || rating < 1 || rating > 5) {
+    const rating = data.review_rating;
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
       return 'Review rating must be a number between 1 and 5';
     }
     
-    if (data.customerEmail && data.customerEmail !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customerEmail)) {
+    if (data.customer_email && data.customer_email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.customer_email)) {
       return 'Invalid email format';
     }
     
@@ -293,7 +286,7 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
 
               console.log(`Row ${rowIndex} mapped data:`, rowData);
 
-              // Convert to our format
+              // Convert to our format - ensure we're using the right property names
               const feedbackItem = {
                 customer_id: rowData.CustomerId || null,
                 customer_name: rowData.CustomerName || '',
@@ -309,9 +302,9 @@ const BulkUpload = ({ onUploadComplete }: BulkUploadProps) => {
                 detected_issues: []
               };
 
-              console.log(`Row ${rowIndex} feedback item:`, feedbackItem);
+              console.log(`Row ${rowIndex} feedback item before validation:`, feedbackItem);
 
-              // Validate the data
+              // Validate the data - pass the feedback item directly
               const validationError = validateFeedbackData(feedbackItem, rowIndex);
               if (validationError) {
                 console.log(`Row ${rowIndex} validation failed:`, validationError);
