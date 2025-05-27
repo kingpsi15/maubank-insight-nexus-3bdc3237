@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Download, Filter } from 'lucide-react';
+import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import SentimentChart from '@/components/charts/SentimentChart';
@@ -33,6 +33,78 @@ const Dashboard = () => {
       customDateTo
     });
   };
+
+  // Service-specific metrics (will be replaced with database data)
+  const serviceMetrics = {
+    overall: {
+      total: 2847,
+      positive: 1823,
+      negative: 1024,
+      avgRating: 4.2,
+      trend: '+12%'
+    },
+    atm: {
+      total: 892,
+      positive: 456,
+      negative: 436,
+      avgRating: 3.8,
+      trend: '-5%'
+    },
+    coreBanking: {
+      total: 1156,
+      positive: 789,
+      negative: 367,
+      avgRating: 4.5,
+      trend: '+18%'
+    },
+    onlineBanking: {
+      total: 799,
+      positive: 578,
+      negative: 221,
+      avgRating: 4.3,
+      trend: '+8%'
+    }
+  };
+
+  const getServiceCard = (title: string, data: any, bgColor: string, textColor: string) => (
+    <Card className={`${bgColor} ${textColor}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span>{title}</span>
+          <div className="flex items-center text-sm">
+            {data.trend.startsWith('+') ? (
+              <TrendingUp className="w-4 h-4 mr-1" />
+            ) : (
+              <TrendingDown className="w-4 h-4 mr-1" />
+            )}
+            {data.trend}
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <div className="text-2xl font-bold">{data.total}</div>
+          <p className="text-sm opacity-90">Total Feedback</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center">
+            <CheckCircle className="w-4 h-4 mr-1" />
+            <span>{data.positive} Positive</span>
+          </div>
+          <div className="flex items-center">
+            <AlertTriangle className="w-4 h-4 mr-1" />
+            <span>{data.negative} Negative</span>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-white/20">
+          <div className="text-xl font-bold">{data.avgRating}</div>
+          <p className="text-sm opacity-90">Average Rating</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
@@ -159,11 +231,11 @@ const Dashboard = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Locations</SelectItem>
-                    <SelectItem value="Mumbai">Mumbai</SelectItem>
-                    <SelectItem value="Delhi">Delhi</SelectItem>
-                    <SelectItem value="Bangalore">Bangalore</SelectItem>
-                    <SelectItem value="Chennai">Chennai</SelectItem>
-                    <SelectItem value="Hyderabad">Hyderabad</SelectItem>
+                    <SelectItem value="Kuala Lumpur">Kuala Lumpur</SelectItem>
+                    <SelectItem value="Selangor">Selangor</SelectItem>
+                    <SelectItem value="Penang">Penang</SelectItem>
+                    <SelectItem value="Johor Bahru">Johor Bahru</SelectItem>
+                    <SelectItem value="Melaka">Melaka</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -171,6 +243,34 @@ const Dashboard = () => {
           </CardContent>
         )}
       </Card>
+
+      {/* Service-specific Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {getServiceCard(
+          "Overall",
+          serviceMetrics.overall,
+          "bg-gradient-to-r from-blue-600 to-blue-700",
+          "text-white"
+        )}
+        {getServiceCard(
+          "ATM",
+          serviceMetrics.atm,
+          "bg-gradient-to-r from-red-500 to-red-600",
+          "text-white"
+        )}
+        {getServiceCard(
+          "CoreBanking",
+          serviceMetrics.coreBanking,
+          "bg-gradient-to-r from-green-500 to-green-600",
+          "text-white"
+        )}
+        {getServiceCard(
+          "OnlineBanking",
+          serviceMetrics.onlineBanking,
+          "bg-gradient-to-r from-purple-500 to-purple-600",
+          "text-white"
+        )}
+      </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
