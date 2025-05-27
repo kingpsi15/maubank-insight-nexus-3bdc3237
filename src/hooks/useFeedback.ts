@@ -16,10 +16,20 @@ export const useFeedback = (filters: any = {}) => {
     queryFn: () => feedbackService.getAll(filters),
   });
 
+  const invalidateAllFeedbackQueries = () => {
+    // Invalidate all feedback-related queries
+    queryClient.invalidateQueries({ queryKey: ['feedback'] });
+    queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
+    queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    // Force refetch for immediate updates
+    queryClient.refetchQueries({ queryKey: ['feedback'] });
+    queryClient.refetchQueries({ queryKey: ['feedback-metrics'] });
+  };
+
   const createFeedbackMutation = useMutation({
     mutationFn: feedbackService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      invalidateAllFeedbackQueries();
       toast({
         title: "Success",
         description: "Feedback created successfully",
@@ -38,7 +48,7 @@ export const useFeedback = (filters: any = {}) => {
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Feedback> }) =>
       feedbackService.update(id, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      invalidateAllFeedbackQueries();
       toast({
         title: "Success",
         description: "Feedback updated successfully",
@@ -56,7 +66,7 @@ export const useFeedback = (filters: any = {}) => {
   const deleteFeedbackMutation = useMutation({
     mutationFn: feedbackService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      invalidateAllFeedbackQueries();
       toast({
         title: "Success",
         description: "Feedback deleted successfully",
@@ -91,5 +101,7 @@ export const useFeedbackMetrics = (filters: any = {}) => {
       console.log('Fetching metrics with filters:', filters);
       return feedbackService.getMetrics(filters);
     },
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache results
   });
 };

@@ -1,44 +1,57 @@
+
 import { useQuery } from '@tanstack/react-query';
-import { analyticsService } from '@/services/analyticsService';
+import { analyticsService } from '@/services';
 
 export const useAnalytics = (filters: any = {}) => {
-  const sentimentQuery = useQuery({
-    queryKey: ['analytics-sentiment', filters],
+  const queryOptions = {
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache results
+  };
+
+  const { data: sentimentData, isLoading: sentimentLoading } = useQuery({
+    queryKey: ['analytics', 'sentiment', filters],
     queryFn: () => analyticsService.getSentimentData(filters),
+    ...queryOptions,
   });
 
-  const serviceQuery = useQuery({
-    queryKey: ['analytics-service', filters],
+  const { data: serviceData, isLoading: serviceLoading } = useQuery({
+    queryKey: ['analytics', 'service', filters],
     queryFn: () => analyticsService.getServiceData(filters),
+    ...queryOptions,
   });
 
-  const locationQuery = useQuery({
-    queryKey: ['analytics-location', filters],
+  const { data: locationData, isLoading: locationLoading } = useQuery({
+    queryKey: ['analytics', 'location', filters],
     queryFn: () => analyticsService.getLocationData(filters),
+    ...queryOptions,
   });
 
-  const ratingQuery = useQuery({
-    queryKey: ['analytics-rating', filters],
+  const { data: ratingData, isLoading: ratingLoading } = useQuery({
+    queryKey: ['analytics', 'rating', filters],
     queryFn: () => analyticsService.getRatingDistribution(filters),
+    ...queryOptions,
   });
 
-  const timelineQuery = useQuery({
-    queryKey: ['analytics-timeline', filters],
+  const { data: timelineData, isLoading: timelineLoading } = useQuery({
+    queryKey: ['analytics', 'timeline', filters],
     queryFn: () => analyticsService.getTimelineData(filters),
+    ...queryOptions,
   });
 
-  const issuesQuery = useQuery({
-    queryKey: ['analytics-issues', filters],
+  const { data: issuesData, isLoading: issuesLoading } = useQuery({
+    queryKey: ['analytics', 'issues', filters],
     queryFn: () => analyticsService.getTopIssues(filters),
+    ...queryOptions,
   });
 
   return {
-    sentimentData: sentimentQuery.data || [],
-    serviceData: serviceQuery.data || [],
-    locationData: locationQuery.data || [],
-    ratingData: ratingQuery.data || [],
-    timelineData: timelineQuery.data || [],
-    issuesData: issuesQuery.data || [],
-    isLoading: sentimentQuery.isLoading || serviceQuery.isLoading || locationQuery.isLoading,
+    sentimentData,
+    serviceData,
+    locationData,
+    ratingData,
+    timelineData,
+    issuesData,
+    isLoading: sentimentLoading || serviceLoading || locationLoading || 
+               ratingLoading || timelineLoading || issuesLoading,
   };
 };

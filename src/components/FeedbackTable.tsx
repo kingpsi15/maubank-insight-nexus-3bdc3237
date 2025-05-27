@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Edit, Calendar, Star, MapPin, User, Download, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useFeedback } from '@/hooks/useFeedback';
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from '@tanstack/react-query';
 
 interface FeedbackTableProps {
   searchTerm: string;
@@ -23,6 +23,7 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter, dateFromFilter
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage] = useState(10);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { feedback, updateFeedback, deleteFeedback, isLoading } = useFeedback({
     search: searchTerm,
@@ -46,6 +47,14 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter, dateFromFilter
   const handleDeleteFeedback = async (feedbackId: string, customerName: string) => {
     try {
       deleteFeedback(feedbackId);
+      // Force immediate refresh of all queries
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['feedback'] });
+        queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
+        queryClient.refetchQueries({ queryKey: ['feedback'] });
+        queryClient.refetchQueries({ queryKey: ['feedback-metrics'] });
+      }, 100);
+      
       toast({
         title: "Feedback Deleted",
         description: `Feedback from ${customerName} has been deleted successfully.`,
@@ -111,6 +120,10 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter, dateFromFilter
 
   const updateStatus = (feedbackId: string, newStatus: string) => {
     updateFeedback({ id: feedbackId, updates: { status: newStatus as any } });
+    // Force refresh after status update
+    setTimeout(() => {
+      queryClient.refetchQueries({ queryKey: ['feedback-metrics'] });
+    }, 100);
   };
 
   const downloadCSV = () => {
