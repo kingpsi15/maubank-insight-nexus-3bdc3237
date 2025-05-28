@@ -16,13 +16,13 @@ const IssueEndorsement = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
-  // Fetch approved issues
+  // Fetch approved issues with resolution field
   const { data: approvedIssues = [], isLoading: loadingApproved } = useQuery({
     queryKey: ['approved-issues'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('issues')
-        .select('*')
+        .select('id, title, description, category, resolution, status, approved_by, approved_date, feedback_count, confidence_score, created_at')
         .eq('status', 'approved')
         .order('approved_date', { ascending: false });
 
@@ -181,9 +181,9 @@ const IssueEndorsement = () => {
                       </p>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2">Approved Resolution:</h4>
+                      <h4 className="font-semibold mb-2">Resolution:</h4>
                       <p className="text-sm bg-green-50 p-3 rounded border-l-4 border-l-green-400">
-                        {issue.resolution}
+                        {issue.resolution || 'No resolution provided'}
                       </p>
                     </div>
                   </div>
