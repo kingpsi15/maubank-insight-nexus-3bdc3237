@@ -1,127 +1,48 @@
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { feedbackService } from '@/services/feedbackService';
-import { Feedback } from '@/services/types';
-import { useToast } from '@/hooks/use-toast';
-
-export const useFeedback = (filters: any = {}) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const {
-    data: feedback = [],
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ['feedback', filters],
-    queryFn: () => feedbackService.getAll(filters),
-    staleTime: 0,
-    gcTime: 0, // Don't cache results to ensure fresh data
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-  });
-
-  const invalidateAllFeedbackQueries = () => {
-    console.log('Invalidating all feedback-related queries');
-    // Invalidate all feedback queries regardless of filters
-    queryClient.invalidateQueries({ queryKey: ['feedback'] });
-    queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
-    queryClient.invalidateQueries({ queryKey: ['analytics'] });
-    
-    // Remove all cached data to force fresh fetches
-    queryClient.removeQueries({ queryKey: ['feedback'] });
-    queryClient.removeQueries({ queryKey: ['feedback-metrics'] });
-    queryClient.removeQueries({ queryKey: ['analytics'] });
-    
-    // Force refetch of current query
-    refetch();
-  };
-
-  const createFeedbackMutation = useMutation({
-    mutationFn: (data: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) => feedbackService.create(data),
-    onSuccess: (data: Feedback) => {
-      console.log('Feedback created successfully:', data.id);
-      invalidateAllFeedbackQueries();
-      toast({
-        title: "Success",
-        description: "Feedback created successfully",
-      });
-    },
-    onError: (error: any) => {
-      console.error('Create feedback error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create feedback",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateFeedbackMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Feedback> }) =>
-      feedbackService.update(id, updates),
-    onSuccess: (data: Feedback) => {
-      console.log('Feedback updated successfully:', data.id);
-      invalidateAllFeedbackQueries();
-      toast({
-        title: "Success",
-        description: "Feedback updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      console.error('Update feedback error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update feedback",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteFeedbackMutation = useMutation({
-    mutationFn: (id: string) => feedbackService.delete(id),
-    onSuccess: () => {
-      console.log('Feedback deleted successfully');
-      invalidateAllFeedbackQueries();
-      toast({
-        title: "Success",
-        description: "Feedback deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      console.error('Delete feedback error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete feedback",
-        variant: "destructive",
-      });
-    },
-  });
-
-  return {
-    feedback,
-    isLoading,
-    error,
-    createFeedback: createFeedbackMutation.mutate,
-    updateFeedback: updateFeedbackMutation.mutate,
-    deleteFeedback: deleteFeedbackMutation.mutate,
-    isCreating: createFeedbackMutation.isPending,
-    isUpdating: updateFeedbackMutation.isPending,
-    isDeleting: deleteFeedbackMutation.isPending,
-    refetch,
-  };
-};
 
 export const useFeedbackMetrics = (filters: any = {}) => {
   return useQuery({
     queryKey: ['feedback-metrics', filters],
-    queryFn: () => {
-      console.log('Fetching metrics with filters:', filters);
-      return feedbackService.getMetrics(filters);
+    queryFn: async () => {
+      console.log('useFeedbackMetrics called with filters:', filters);
+      
+      const metrics = await feedbackService.getMetrics(filters);
+      console.log('Raw metrics from feedbackService:', metrics);
+      
+      // The feedbackService.getMetrics already returns the correct structure
+      // but we need to ensure resolved/pending are calculated correctly
+      const result = {
+        total: metrics.total || 0,
+        positive: metrics.positive || 0,
+        negative: metrics.negative || 0,
+        neutral: metrics.neutral || 0,
+        resolved: metrics.resolved || 0,
+        pending: metrics.pending || 0,
+        escalated: metrics.escalated || 0,
+        avgRating: metrics.avgRating || 0,
+        trend: metrics.trend || 0,
+        ratingDistribution: metrics.ratingDistribution || {},
+        data: metrics.data || []
+      };
+      
+      console.log('Final metrics returned by useFeedbackMetrics:', result);
+      return result;
     },
     staleTime: 0,
-    gcTime: 0, // Don't cache to ensure fresh data
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useFeedback = (filters: any = {}) => {
+  return useQuery({
+    queryKey: ['feedback', filters],
+    queryFn: () => feedbackService.getAll(filters),
+    staleTime: 0,
+    gcTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });

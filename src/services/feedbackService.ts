@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Feedback } from './types';
 
@@ -242,11 +241,17 @@ export const feedbackService = {
     const uniqueServiceTypes = [...new Set(feedbackData.map(f => f.service_type))];
     console.log('Unique service types in results:', uniqueServiceTypes);
     
+    // Log unique statuses to debug the issue
+    const uniqueStatuses = [...new Set(feedbackData.map(f => f.status))];
+    console.log('Unique statuses in results:', uniqueStatuses);
+    
     const total = feedbackData.length;
     const positive = feedbackData.filter(f => f.sentiment === 'positive').length;
     const negative = feedbackData.filter(f => f.sentiment === 'negative').length;
     const neutral = feedbackData.filter(f => f.sentiment === 'neutral').length;
-    const pending = feedbackData.filter(f => f.status === 'new' || f.status === 'pending').length;
+    
+    // Fix the pending calculation - it should be 'new' and 'in_progress', not 'pending'
+    const pending = feedbackData.filter(f => f.status === 'new' || f.status === 'in_progress').length;
     const resolved = feedbackData.filter(f => f.status === 'resolved').length;
     const escalated = feedbackData.filter(f => f.status === 'escalated').length;
 
@@ -289,6 +294,9 @@ export const feedbackService = {
       total: metrics.total,
       positive: metrics.positive,
       negative: metrics.negative,
+      pending: metrics.pending,
+      resolved: metrics.resolved,
+      escalated: metrics.escalated,
       avgRating: metrics.avgRating.toFixed(1),
       trend: metrics.trend
     });

@@ -9,6 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      analytics_snapshots: {
+        Row: {
+          avg_rating: number | null
+          created_at: string | null
+          id: string
+          location: string | null
+          negative_count: number | null
+          positive_count: number | null
+          resolution_rate: number | null
+          service_type: string | null
+          snapshot_date: string
+          total_feedback: number | null
+        }
+        Insert: {
+          avg_rating?: number | null
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          negative_count?: number | null
+          positive_count?: number | null
+          resolution_rate?: number | null
+          service_type?: string | null
+          snapshot_date: string
+          total_feedback?: number | null
+        }
+        Update: {
+          avg_rating?: number | null
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          negative_count?: number | null
+          positive_count?: number | null
+          resolution_rate?: number | null
+          service_type?: string | null
+          snapshot_date?: string
+          total_feedback?: number | null
+        }
+        Relationships: []
+      }
       bank_employees: {
         Row: {
           branch_location: string | null
@@ -38,6 +77,57 @@ export type Database = {
           role?: string | null
         }
         Relationships: []
+      }
+      customer_followups: {
+        Row: {
+          conducted_by: string | null
+          created_at: string | null
+          feedback_id: string
+          followup_date: string | null
+          followup_status: string | null
+          followup_type: string
+          id: string
+          response_received: boolean | null
+          response_text: string | null
+        }
+        Insert: {
+          conducted_by?: string | null
+          created_at?: string | null
+          feedback_id: string
+          followup_date?: string | null
+          followup_status?: string | null
+          followup_type: string
+          id?: string
+          response_received?: boolean | null
+          response_text?: string | null
+        }
+        Update: {
+          conducted_by?: string | null
+          created_at?: string | null
+          feedback_id?: string
+          followup_date?: string | null
+          followup_status?: string | null
+          followup_type?: string
+          id?: string
+          response_received?: boolean | null
+          response_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_followups_conducted_by_fkey"
+            columns: ["conducted_by"]
+            isOneToOne: false
+            referencedRelation: "bank_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_followups_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       employee_feedback_interactions: {
         Row: {
@@ -141,6 +231,58 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_escalations: {
+        Row: {
+          created_at: string | null
+          escalated_from: string | null
+          escalated_to: string | null
+          escalation_notes: string | null
+          escalation_reason: string
+          feedback_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          escalated_from?: string | null
+          escalated_to?: string | null
+          escalation_notes?: string | null
+          escalation_reason: string
+          feedback_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          escalated_from?: string | null
+          escalated_to?: string | null
+          escalation_notes?: string | null
+          escalation_reason?: string
+          feedback_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_escalations_escalated_from_fkey"
+            columns: ["escalated_from"]
+            isOneToOne: false
+            referencedRelation: "bank_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_escalations_escalated_to_fkey"
+            columns: ["escalated_to"]
+            isOneToOne: false
+            referencedRelation: "bank_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_escalations_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback_issues: {
         Row: {
           created_at: string | null
@@ -173,6 +315,57 @@ export type Database = {
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback_resolutions: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string | null
+          feedback_id: string
+          id: string
+          implementation_notes: string | null
+          resolution_status: string | null
+          resolution_text: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          feedback_id: string
+          id?: string
+          implementation_notes?: string | null
+          resolution_status?: string | null
+          resolution_text: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          feedback_id?: string
+          id?: string
+          implementation_notes?: string | null
+          resolution_status?: string | null
+          resolution_text?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_resolutions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "bank_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_resolutions_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedback"
             referencedColumns: ["id"]
           },
         ]
