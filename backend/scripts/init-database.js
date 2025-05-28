@@ -1,4 +1,3 @@
-
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
@@ -6,7 +5,7 @@ const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || ''
+  password: process.env.DB_PASSWORD || 'root_123'
 };
 
 const DATABASE_NAME = process.env.DB_NAME || 'feedback_db';
@@ -20,10 +19,19 @@ async function initializeDatabase() {
     
     // Create database if it doesn't exist
     console.log(`Creating database ${DATABASE_NAME} if it doesn't exist...`);
-    await connection.execute(`CREATE DATABASE IF NOT EXISTS ${DATABASE_NAME}`);
+    await connection.query(`CREATE DATABASE IF NOT EXISTS ${DATABASE_NAME}`);
     
-    // Use the database
-    await connection.execute(`USE ${DATABASE_NAME}`);
+    // Close the initial connection
+    await connection.end();
+    
+    // Reconnect with the database specified
+    const dbConfigWithDB = {
+      ...dbConfig,
+      database: DATABASE_NAME
+    };
+    
+    console.log(`Connecting to database ${DATABASE_NAME}...`);
+    connection = await mysql.createConnection(dbConfigWithDB);
     
     // Create feedback table (main table)
     console.log('Creating feedback table...');

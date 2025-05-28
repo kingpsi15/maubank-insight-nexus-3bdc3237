@@ -1,4 +1,3 @@
-
 // MySQL Database Service - Single source of truth for all data
 interface MySQLConfig {
   host: string;
@@ -32,15 +31,14 @@ class MySQLService {
 
   constructor() {
     // Backend API server for MySQL connection
-    this.apiBaseUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://your-production-api.com/api' 
-      : 'http://localhost:3001/api';
+    this.apiBaseUrl = 'http://localhost:3001/api';
+    console.log('MySQL Service initialized with API URL:', this.apiBaseUrl);
     
     this.config = {
       host: 'localhost',
       port: 3306,
       user: 'root',
-      password: '',
+      password: 'root_123',
       database: 'feedback_db'
     };
   }
@@ -103,11 +101,12 @@ class MySQLService {
       });
 
       if (!response.ok) {
+        console.error(`HTTP error! status: ${response.status} - ${response.statusText}`);
         throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log(`Fetched ${data.length} records from MySQL feedback_db`);
+      console.log(`Fetched ${data.length} records from MySQL feedback_db:`, data);
       return data;
     } catch (error) {
       console.error('Error fetching MySQL feedback data:', error);
@@ -182,6 +181,48 @@ class MySQLService {
 
   async getMetrics(filters: any = {}) {
     try {
+      console.log('Getting metrics with filters:', filters);
+      const queryParams = new URLSearchParams();
+      
+      if (filters.service && filters.service !== 'all') {
+        queryParams.append('service', filters.service);
+      }
+      
+      if (filters.location && filters.location !== 'all') {
+        queryParams.append('location', filters.location);
+      }
+      
+      const url = `${this.apiBaseUrl}/metrics?${queryParams}`;
+      console.log('Fetching metrics from URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Received metrics data:', data);
+      
+      return {
+        total: data.total || 0,
+        positive: data.positive || 0,
+        negative: data.negative || 0,
+        resolved: data.resolved || 0,
+        pending: data.pending || 0,
+        avgRating: data.avgRating || 0,
+        trend: data.trend || 1.8
+      };
+    } catch (error) {
+      console.error('Error fetching metrics from API:', error);
+      
+      // Fallback to local calculation if API fails
       const feedback = await this.getFeedback(filters);
       
       const total = feedback.length;
@@ -202,6 +243,8 @@ class MySQLService {
       } else {
         trend = 1.8; // Overall positive trend
       }
+      
+      console.log('Using fallback metrics calculation:', { total, positive, negative, resolved, pending, avgRating, trend });
 
       return {
         total,
@@ -211,17 +254,6 @@ class MySQLService {
         pending,
         avgRating,
         trend
-      };
-    } catch (error) {
-      console.error('Error calculating MySQL metrics:', error);
-      return {
-        total: 0,
-        positive: 0,
-        negative: 0,
-        resolved: 0,
-        pending: 0,
-        avgRating: 0,
-        trend: 0
       };
     }
   }
