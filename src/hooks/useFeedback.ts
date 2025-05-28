@@ -1,5 +1,5 @@
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { feedbackService } from '@/services/feedbackService';
 
 export const useFeedbackMetrics = (filters: any = {}) => {
@@ -38,7 +38,9 @@ export const useFeedbackMetrics = (filters: any = {}) => {
 };
 
 export const useFeedback = (filters: any = {}) => {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
     queryKey: ['feedback', filters],
     queryFn: () => feedbackService.getAll(filters),
     staleTime: 0,
@@ -46,4 +48,40 @@ export const useFeedback = (filters: any = {}) => {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
+
+  const createMutation = useMutation({
+    mutationFn: feedbackService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: any }) => 
+      feedbackService.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: feedbackService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feedback'] });
+      queryClient.invalidateQueries({ queryKey: ['feedback-metrics'] });
+    },
+  });
+
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error,
+    feedback: query.data || [],
+    createFeedback: createMutation.mutate,
+    isCreating: createMutation.isPending,
+    updateFeedback: updateMutation.mutate,
+    deleteFeedback: deleteMutation.mutate,
+  };
 };

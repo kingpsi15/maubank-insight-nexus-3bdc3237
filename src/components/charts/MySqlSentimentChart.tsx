@@ -26,6 +26,9 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
     );
   }
 
+  // Filter out neutral sentiment as requested
+  const filteredData = sentimentData.filter(item => item.name !== 'Neutral');
+
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -52,7 +55,7 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={sentimentData}
+            data={filteredData}
             cx="50%"
             cy="50%"
             labelLine={false}
@@ -61,7 +64,7 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
             fill="#8884d8"
             dataKey="value"
           >
-            {sentimentData.map((entry, index) => (
+            {filteredData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
           </Pie>

@@ -112,29 +112,34 @@ export const analyticsService = {
       return [];
     }
 
-    // Process service data by sentiment
-    const serviceData: { [key: string]: { positive: number, negative: number, total: number } } = {};
+    // Process service data by sentiment - ensure all three services are included
+    const serviceData: { [key: string]: { positive: number, negative: number, total: number } } = {
+      'ATM': { positive: 0, negative: 0, total: 0 },
+      'CoreBanking': { positive: 0, negative: 0, total: 0 },
+      'OnlineBanking': { positive: 0, negative: 0, total: 0 }
+    };
 
     data?.forEach(item => {
       const service = item.service_type || 'Unknown';
-      if (!serviceData[service]) {
-        serviceData[service] = { positive: 0, negative: 0, total: 0 };
-      }
-      
-      serviceData[service].total++;
-      if (item.sentiment === 'positive') {
-        serviceData[service].positive++;
-      } else if (item.sentiment === 'negative') {
-        serviceData[service].negative++;
+      if (serviceData[service]) {
+        serviceData[service].total++;
+        if (item.sentiment === 'positive') {
+          serviceData[service].positive++;
+        } else if (item.sentiment === 'negative') {
+          serviceData[service].negative++;
+        }
       }
     });
 
-    const result = Object.entries(serviceData).map(([service, data]) => ({
-      service,
-      positive: data.positive,
-      negative: data.negative,
-      total: data.total
-    }));
+    // Only return services that have data, but ensure all three main services are represented
+    const result = Object.entries(serviceData)
+      .filter(([service, data]) => data.total > 0 || ['ATM', 'CoreBanking', 'OnlineBanking'].includes(service))
+      .map(([service, data]) => ({
+        service,
+        positive: data.positive,
+        negative: data.negative,
+        total: data.total
+      }));
 
     console.log('getServiceData returning:', result);
     return result;
