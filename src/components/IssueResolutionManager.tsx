@@ -343,85 +343,6 @@ const IssueResolutionManager = () => {
     return 'bg-red-100 text-red-800';
   };
 
-  const handleMapToExisting = (issue: PendingIssueWithResolution) => {
-    setCurrentIssue(issue);
-    setIsDialogOpen(true);
-  };
-
-  const handleConfirmMapping = async () => {
-    if (selectedExistingIssue && currentIssue) {
-      try {
-        const existingIssue = existingIssues.find(ei => ei.id === selectedExistingIssue);
-        
-        // Update existing issue feedback count by incrementing it
-        const newFeedbackCount = (existingIssue?.feedback_count || 0) + 1;
-        const { error: updateError } = await supabase
-          .from('issues')
-          .update({ 
-            feedback_count: newFeedbackCount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', selectedExistingIssue);
-
-        if (updateError) throw updateError;
-
-        // Delete pending issue
-        await supabase.from('pending_issues').delete().eq('id', currentIssue.id);
-        
-        refetch();
-        toast({
-          title: "Issue Mapped",
-          description: `Feedback mapped to existing issue: "${existingIssue?.title}"`,
-        });
-        setIsDialogOpen(false);
-        setSelectedExistingIssue('');
-        setCurrentIssue(null);
-      } catch (error) {
-        console.error('Error mapping issue:', error);
-        toast({
-          title: "Error",
-          description: "Failed to map issue. Please try again.",
-          variant: "destructive"
-        });
-      }
-    }
-  };
-
-  const handleReject = async (issueId: string, issue: PendingIssueWithResolution) => {
-    try {
-      // Move to rejected issues table
-      const { error: rejectError } = await supabase
-        .from('rejected_issues')
-        .insert({
-          original_title: issue.title,
-          original_description: issue.description,
-          category: issue.category,
-          rejection_reason: 'Manually rejected by reviewer',
-          rejected_by: user?.name || 'System',
-          original_pending_issue_id: issueId
-        });
-
-      if (rejectError) throw rejectError;
-
-      // Delete pending issue
-      await supabase.from('pending_issues').delete().eq('id', issueId);
-      
-      refetch();
-      toast({
-        title: "Issue Rejected",
-        description: "The issue has been rejected and archived.",
-        variant: "destructive"
-      });
-    } catch (error) {
-      console.error('Error rejecting issue:', error);
-      toast({
-        title: "Error",
-        description: "Failed to reject issue. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -525,7 +446,7 @@ const IssueResolutionManager = () => {
                   <h4 className="font-semibold">
                     {hasExistingResolution ? 'AI-Generated Resolution:' : 'Recommended Resolution:'}
                   </h4>
-                  <Badge className={getConfidenceColor(resolutionConfidence)} variant="outline" size="sm" className="ml-2">
+                  <Badge className={getConfidenceColor(resolutionConfidence)} variant="outline" className="ml-2">
                     {Math.round(resolutionConfidence * 100)}% confidence
                   </Badge>
                 </div>
