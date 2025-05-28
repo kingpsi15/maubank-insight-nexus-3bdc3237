@@ -13,12 +13,47 @@ export const useMysqlAnalytics = (filters: any) => {
         query = query.eq('service_type', filters.service);
       }
       
+      if (filters.location && filters.location !== 'all') {
+        query = query.eq('issue_location', filters.location);
+      }
+      
+      if (filters.dateRange && filters.dateRange !== 'all') {
+        const now = new Date();
+        let startDate = new Date();
+        
+        switch (filters.dateRange) {
+          case 'last_week':
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case 'last_month':
+            startDate.setMonth(now.getMonth() - 1);
+            break;
+          case 'last_quarter':
+            startDate.setMonth(now.getMonth() - 3);
+            break;
+          case 'last_year':
+            startDate.setFullYear(now.getFullYear() - 1);
+            break;
+        }
+        
+        query = query.gte('created_at', startDate.toISOString());
+      }
+      
+      if (filters.customDateFrom) {
+        query = query.gte('created_at', filters.customDateFrom);
+      }
+      
+      if (filters.customDateTo) {
+        query = query.lte('created_at', filters.customDateTo);
+      }
+      
       const { data } = await query;
       const feedback = data || [];
       
       const positive = feedback.filter(f => f.positive_flag).length;
       const negative = feedback.filter(f => f.negative_flag).length;
       
+      // Only return positive and negative, no neutral
       return [
         { name: 'Positive', value: positive, fill: '#10B981' },
         { name: 'Negative', value: negative, fill: '#EF4444' }
@@ -29,9 +64,47 @@ export const useMysqlAnalytics = (filters: any) => {
   const serviceQuery = useQuery({
     queryKey: ['mysql-service-data', filters],
     queryFn: async () => {
-      const { data } = await supabase.from('feedback').select('service_type, positive_flag, negative_flag');
+      let query = supabase.from('feedback').select('service_type, positive_flag, negative_flag');
+      
+      // Apply location and date filters but NOT service filter for service breakdown
+      if (filters.location && filters.location !== 'all') {
+        query = query.eq('issue_location', filters.location);
+      }
+      
+      if (filters.dateRange && filters.dateRange !== 'all') {
+        const now = new Date();
+        let startDate = new Date();
+        
+        switch (filters.dateRange) {
+          case 'last_week':
+            startDate.setDate(now.getDate() - 7);
+            break;
+          case 'last_month':
+            startDate.setMonth(now.getMonth() - 1);
+            break;
+          case 'last_quarter':
+            startDate.setMonth(now.getMonth() - 3);
+            break;
+          case 'last_year':
+            startDate.setFullYear(now.getFullYear() - 1);
+            break;
+        }
+        
+        query = query.gte('created_at', startDate.toISOString());
+      }
+      
+      if (filters.customDateFrom) {
+        query = query.gte('created_at', filters.customDateFrom);
+      }
+      
+      if (filters.customDateTo) {
+        query = query.lte('created_at', filters.customDateTo);
+      }
+      
+      const { data } = await query;
       const feedback = data || [];
       
+      // Ensure all three services are included
       const services = ['ATM', 'OnlineBanking', 'CoreBanking'];
       return services.map(service => {
         const serviceData = feedback.filter(f => f.service_type === service);

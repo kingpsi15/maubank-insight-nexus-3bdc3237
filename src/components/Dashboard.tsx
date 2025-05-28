@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -312,7 +311,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <SentimentChart filters={filters} />
+              <SentimentChart />
             )}
           </CardContent>
         </Card>
@@ -327,7 +326,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <RatingDistribution filters={filters} />
+              <RatingDistribution />
             )}
           </CardContent>
         </Card>
@@ -342,7 +341,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <ServiceChart filters={filters} />
+              <ServiceChart />
             )}
           </CardContent>
         </Card>
@@ -357,7 +356,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <LocationChart filters={filters} />
+              <LocationChart />
             )}
           </CardContent>
         </Card>
@@ -372,7 +371,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <TimelineChart filters={filters} />
+              <TimelineChart />
             )}
           </CardContent>
         </Card>
@@ -387,7 +386,7 @@ const Dashboard = () => {
             {analyticsLoading ? (
               <div className="h-64 flex items-center justify-center">Loading...</div>
             ) : (
-              <IssuesChart filters={filters} />
+              <IssuesChart />
             )}
           </CardContent>
         </Card>
