@@ -7,10 +7,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useFeedbackMetrics } from '@/hooks/useFeedback';
-import { useAnalytics } from '@/hooks/useAnalytics';
-import SentimentChart from '@/components/charts/SentimentChart';
-import ServiceChart from '@/components/charts/ServiceChart';
+import { useMySQLMetrics } from '@/hooks/useMySQLData';
+import { useMySQLAnalytics } from '@/hooks/useMySQLData';
+import MySqlSentimentChart from '@/components/charts/MySqlSentimentChart';
+import MySqlServiceChart from '@/components/charts/MySqlServiceChart';
 import LocationChart from '@/components/charts/LocationChart';
 import TimelineChart from '@/components/charts/TimelineChart';
 import IssuesChart from '@/components/charts/IssuesChart';
@@ -33,34 +33,30 @@ const Dashboard = () => {
     customDateTo: customDateTo?.toISOString()
   };
 
-  const { data: overallMetrics, isLoading } = useFeedbackMetrics(filters);
+  const { data: overallMetrics, isLoading } = useMySQLMetrics(filters);
   
   // Create specific filters for each service type
-  const { data: atmMetrics } = useFeedbackMetrics({ 
+  const { data: atmMetrics } = useMySQLMetrics({ 
     ...filters, 
     service: 'ATM' 
   });
   
-  const { data: coreBankingMetrics } = useFeedbackMetrics({ 
+  const { data: coreBankingMetrics } = useMySQLMetrics({ 
     ...filters, 
     service: 'CoreBanking' 
   });
   
-  const { data: onlineBankingMetrics } = useFeedbackMetrics({ 
+  const { data: onlineBankingMetrics } = useMySQLMetrics({ 
     ...filters, 
     service: 'OnlineBanking' 
   });
 
-  // Get analytics data using the useAnalytics hook
+  // Get analytics data using the MySQL analytics hook
   const {
     sentimentData,
     serviceData,
-    locationData,
-    ratingData,
-    timelineData,
-    issuesData,
     isLoading: analyticsLoading
-  } = useAnalytics(filters);
+  } = useMySQLAnalytics(filters);
 
   const handleExportCSV = () => {
     // Export functionality based on current filters
@@ -86,7 +82,7 @@ const Dashboard = () => {
             <CardTitle className="text-lg">{title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="animate-pulse">Loading...</div>
+            <div className="animate-pulse">Loading MySQL data...</div>
           </CardContent>
         </Card>
       );
@@ -135,6 +131,18 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {/* Connection Status */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="pt-6">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-blue-800">
+              Connected to MySQL Database (localhost:3001)
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card>
         <CardHeader>
@@ -305,13 +313,13 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Overall Sentiment Distribution</CardTitle>
-            <CardDescription>Customer sentiment breakdown across all feedback</CardDescription>
+            <CardDescription>Customer sentiment breakdown from MySQL database</CardDescription>
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
-              <SentimentChart />
+              <MySqlSentimentChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -320,11 +328,11 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Rating Distribution</CardTitle>
-            <CardDescription>Distribution of customer ratings (0-5 scale)</CardDescription>
+            <CardDescription>Distribution of customer ratings (MySQL data)</CardDescription>
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
               <RatingDistribution />
             )}
@@ -335,13 +343,13 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Service-wise Sentiment</CardTitle>
-            <CardDescription>Sentiment breakdown by service type</CardDescription>
+            <CardDescription>Sentiment breakdown by service type (MySQL data)</CardDescription>
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
-              <ServiceChart />
+              <MySqlServiceChart filters={filters} />
             )}
           </CardContent>
         </Card>
@@ -354,7 +362,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
               <LocationChart />
             )}
@@ -369,7 +377,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
               <TimelineChart />
             )}
@@ -384,7 +392,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading...</div>
+              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
             ) : (
               <IssuesChart />
             )}
