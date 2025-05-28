@@ -72,15 +72,17 @@ const BankEmployeeAnalytics = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  // Calculate aggregate statistics from employee stats
+  // Calculate aggregate statistics from employee stats with proper type checking
   const avgRating = employeeStats.length > 0 ? 
-    employeeStats.reduce((sum: number, emp: any) => sum + (emp.avg_rating || 0), 0) / employeeStats.length : 0;
+    employeeStats.reduce((sum: number, emp: any) => sum + (Number(emp.avg_rating) || 0), 0) / employeeStats.length : 0;
   
-  const totalContacts = employeeStats.reduce((sum: number, emp: any) => sum + (emp.contacted_count || 0), 0);
+  const totalContacts = employeeStats.reduce((sum: number, emp: any) => sum + (Number(emp.contacted_count) || 0), 0);
   
   const avgResolutionRate = employeeStats.length > 0 ? 
     employeeStats.reduce((sum: number, emp: any) => {
-      const rate = emp.total_interactions > 0 ? (emp.resolved_count / emp.total_interactions) * 100 : 0;
+      const totalInteractions = Number(emp.total_interactions) || 0;
+      const resolvedCount = Number(emp.resolved_count) || 0;
+      const rate = totalInteractions > 0 ? (resolvedCount / totalInteractions) * 100 : 0;
       return sum + rate;
     }, 0) / employeeStats.length : 0;
 
@@ -161,9 +163,11 @@ const BankEmployeeAnalytics = () => {
         <CardContent>
           <div className="space-y-4">
             {employeeStats.map((employee: any) => {
-              const resolutionRate = employee.total_interactions > 0 ? 
-                (employee.resolved_count / employee.total_interactions) * 100 : 0;
-              const performanceBadge = getPerformanceBadge(employee.avg_rating || 0);
+              const totalInteractions = Number(employee.total_interactions) || 0;
+              const resolvedCount = Number(employee.resolved_count) || 0;
+              const resolutionRate = totalInteractions > 0 ? 
+                (resolvedCount / totalInteractions) * 100 : 0;
+              const performanceBadge = getPerformanceBadge(Number(employee.avg_rating) || 0);
               
               return (
                 <Card key={employee.employee_id} className="p-4">
@@ -187,17 +191,17 @@ const BankEmployeeAnalytics = () => {
 
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-blue-600">{employee.contacted_count || 0}</div>
+                          <div className="text-xl font-bold text-blue-600">{Number(employee.contacted_count) || 0}</div>
                           <div className="text-xs text-gray-600">Contacts</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-green-600">{(employee.avg_rating || 0).toFixed(1)}</div>
+                          <div className="text-xl font-bold text-green-600">{(Number(employee.avg_rating) || 0).toFixed(1)}</div>
                           <div className="text-xs text-gray-600">Avg Rating</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-purple-600">{employee.resolved_count || 0}</div>
+                          <div className="text-xl font-bold text-purple-600">{Number(employee.resolved_count) || 0}</div>
                           <div className="text-xs text-gray-600">Resolved</div>
                         </div>
                         
