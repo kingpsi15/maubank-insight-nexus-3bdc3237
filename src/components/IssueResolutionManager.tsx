@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle, XCircle, Edit, Plus, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Edit, Plus, Loader2, Lightbulb } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -91,9 +92,51 @@ const IssueResolutionManager = () => {
     },
   });
 
+  // Generate fallback recommendation based on category and title
+  const generateFallbackRecommendation = (issue: PendingIssueWithResolution): string => {
+    const category = issue.category?.toLowerCase();
+    const title = issue.title?.toLowerCase();
+
+    if (category?.includes('atm') || title?.includes('atm')) {
+      return "Please check the ATM status and ensure it's operational. If the issue persists, contact the technical support team to inspect the machine. Consider placing an 'Out of Order' sign if necessary and direct customers to the nearest working ATM.";
+    }
+    
+    if (category?.includes('online') || category?.includes('banking') || title?.includes('online')) {
+      return "Please verify the customer's login credentials and check for any system maintenance windows. Guide the customer through clearing browser cache/cookies or trying a different browser. If the issue persists, escalate to the IT support team.";
+    }
+    
+    if (category?.includes('core') || category?.includes('system')) {
+      return "This appears to be a core banking system issue. Please check the system status dashboard and contact the technical operations team immediately. Document the error details and customer information for further investigation.";
+    }
+    
+    if (title?.includes('wait') || title?.includes('queue') || title?.includes('time')) {
+      return "Consider implementing a queue management system or adding more service counters during peak hours. Train staff on efficient customer service techniques and consider offering appointment-based services for complex transactions.";
+    }
+    
+    if (title?.includes('staff') || title?.includes('service')) {
+      return "Provide additional customer service training to staff members. Review and update service protocols. Consider implementing a customer feedback system and regular staff performance evaluations.";
+    }
+
+    return "Please review this issue with the appropriate department. Ensure proper documentation and follow standard escalation procedures. Contact the customer to acknowledge their concern and provide updates on resolution progress.";
+  };
+
+  const getResolutionText = (issue: PendingIssueWithResolution): string => {
+    if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
+      return issue.pending_resolutions[0].resolution_text;
+    }
+    return generateFallbackRecommendation(issue);
+  };
+
+  const getResolutionConfidence = (issue: PendingIssueWithResolution): number => {
+    if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
+      return issue.pending_resolutions[0].confidence_score || 0.8;
+    }
+    return 0.75; // Default confidence for generated recommendations
+  };
+
   const handleAcceptAsNew = async (issue: PendingIssueWithResolution) => {
     try {
-      const resolution = issue.pending_resolutions?.[0]?.resolution_text || 'Manual review required for appropriate resolution.';
+      const resolution = getResolutionText(issue);
       
       // Create new approved issue
       const { error: issueError } = await supabase
@@ -118,7 +161,7 @@ const IssueResolutionManager = () => {
       refetch();
       toast({
         title: "New Issue Created",
-        description: `"${issue.title}" has been added to the master issues list.`,
+        description: `"${issue.title}" has been added to the master issues list with recommended resolution.`,
       });
     } catch (error) {
       console.error('Error accepting issue:', error);
@@ -257,6 +300,17 @@ const IssueResolutionManager = () => {
           .eq('id', resolutionId);
 
         if (error) throw error;
+      } else {
+        // Create new resolution if none exists
+        const { error } = await supabase
+          .from('pending_resolutions')
+          .insert({
+            pending_issue_id: issueId,
+            resolution_text: editedResolutionText,
+            confidence_score: 0.8
+          });
+
+        if (error) throw error;
       }
 
       refetch();
@@ -289,6 +343,85 @@ const IssueResolutionManager = () => {
     return 'bg-red-100 text-red-800';
   };
 
+  const handleMapToExisting = (issue: PendingIssueWithResolution) => {
+    setCurrentIssue(issue);
+    setIsDialogOpen(true);
+  };
+
+  const handleConfirmMapping = async () => {
+    if (selectedExistingIssue && currentIssue) {
+      try {
+        const existingIssue = existingIssues.find(ei => ei.id === selectedExistingIssue);
+        
+        // Update existing issue feedback count by incrementing it
+        const newFeedbackCount = (existingIssue?.feedback_count || 0) + 1;
+        const { error: updateError } = await supabase
+          .from('issues')
+          .update({ 
+            feedback_count: newFeedbackCount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedExistingIssue);
+
+        if (updateError) throw updateError;
+
+        // Delete pending issue
+        await supabase.from('pending_issues').delete().eq('id', currentIssue.id);
+        
+        refetch();
+        toast({
+          title: "Issue Mapped",
+          description: `Feedback mapped to existing issue: "${existingIssue?.title}"`,
+        });
+        setIsDialogOpen(false);
+        setSelectedExistingIssue('');
+        setCurrentIssue(null);
+      } catch (error) {
+        console.error('Error mapping issue:', error);
+        toast({
+          title: "Error",
+          description: "Failed to map issue. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleReject = async (issueId: string, issue: PendingIssueWithResolution) => {
+    try {
+      // Move to rejected issues table
+      const { error: rejectError } = await supabase
+        .from('rejected_issues')
+        .insert({
+          original_title: issue.title,
+          original_description: issue.description,
+          category: issue.category,
+          rejection_reason: 'Manually rejected by reviewer',
+          rejected_by: user?.name || 'System',
+          original_pending_issue_id: issueId
+        });
+
+      if (rejectError) throw rejectError;
+
+      // Delete pending issue
+      await supabase.from('pending_issues').delete().eq('id', issueId);
+      
+      refetch();
+      toast({
+        title: "Issue Rejected",
+        description: "The issue has been rejected and archived.",
+        variant: "destructive"
+      });
+    } catch (error) {
+      console.error('Error rejecting issue:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject issue. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -314,82 +447,95 @@ const IssueResolutionManager = () => {
 
   return (
     <div className="space-y-4">
-      {pendingIssues.map((issue) => (
-        <Card key={issue.id} className="border-l-4 border-l-orange-500">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Badge variant="outline">{issue.category}</Badge>
-                  <Badge className={getConfidenceColor(issue.confidence_score || 0)}>
-                    {Math.round((issue.confidence_score || 0) * 100)}% confidence
-                  </Badge>
-                  <Badge variant="secondary">
-                    {issue.feedback_count} feedback{issue.feedback_count !== 1 ? 's' : ''}
-                  </Badge>
-                  {issue.feedback?.issue_location && (
-                    <Badge variant="secondary">{issue.feedback.issue_location}</Badge>
-                  )}
-                </div>
-                <CardTitle className="text-lg">
-                  {editingIssue === issue.id ? (
-                    <div className="space-y-2">
-                      <Textarea
-                        value={editedIssueText}
-                        onChange={(e) => setEditedIssueText(e.target.value)}
-                        className="mt-2"
-                      />
-                      <div className="flex space-x-2">
-                        <Button size="sm" onClick={() => saveIssueEdit(issue.id)}>
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={cancelEdit}>
-                          Cancel
+      {pendingIssues.map((issue) => {
+        const resolutionText = getResolutionText(issue);
+        const resolutionConfidence = getResolutionConfidence(issue);
+        const hasExistingResolution = issue.pending_resolutions && issue.pending_resolutions.length > 0;
+
+        return (
+          <Card key={issue.id} className="border-l-4 border-l-orange-500">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Badge variant="outline">{issue.category}</Badge>
+                    <Badge className={getConfidenceColor(issue.confidence_score || 0)}>
+                      {Math.round((issue.confidence_score || 0) * 100)}% confidence
+                    </Badge>
+                    <Badge variant="secondary">
+                      {issue.feedback_count} feedback{issue.feedback_count !== 1 ? 's' : ''}
+                    </Badge>
+                    {issue.feedback?.issue_location && (
+                      <Badge variant="secondary">{issue.feedback.issue_location}</Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-lg">
+                    {editingIssue === issue.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editedIssueText}
+                          onChange={(e) => setEditedIssueText(e.target.value)}
+                          className="mt-2"
+                        />
+                        <div className="flex space-x-2">
+                          <Button size="sm" onClick={() => saveIssueEdit(issue.id)}>
+                            Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEdit}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span>{issue.title}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => startEditIssue(issue.id, issue.title)}
+                        >
+                          <Edit className="w-4 h-4" />
                         </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span>{issue.title}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => startEditIssue(issue.id, issue.title)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </CardTitle>
-                <CardDescription className="mt-2">
-                  {issue.feedback && (
-                    <>
-                      <strong>Customer:</strong> {issue.feedback.customer_name} | 
-                      <strong> Detected:</strong> {new Date(issue.created_at).toLocaleDateString()}
-                    </>
-                  )}
-                </CardDescription>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="mt-2">
+                    {issue.feedback && (
+                      <>
+                        <strong>Customer:</strong> {issue.feedback.customer_name} | 
+                        <strong> Detected:</strong> {new Date(issue.created_at).toLocaleDateString()}
+                      </>
+                    )}
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
-            {issue.feedback?.review_text && (
-              <div>
-                <h4 className="font-semibold mb-2">Original Feedback:</h4>
-                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{issue.feedback.review_text}</p>
-              </div>
-            )}
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+              {issue.feedback?.review_text && (
+                <div>
+                  <h4 className="font-semibold mb-2">Original Feedback:</h4>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{issue.feedback.review_text}</p>
+                </div>
+              )}
 
-            {issue.pending_resolutions?.[0] && (
               <div>
-                <h4 className="font-semibold mb-2">Suggested Resolution:</h4>
+                <div className="flex items-center mb-2">
+                  <Lightbulb className="w-4 h-4 mr-2 text-blue-600" />
+                  <h4 className="font-semibold">
+                    {hasExistingResolution ? 'AI-Generated Resolution:' : 'Recommended Resolution:'}
+                  </h4>
+                  <Badge className={getConfidenceColor(resolutionConfidence)} variant="outline" size="sm" className="ml-2">
+                    {Math.round(resolutionConfidence * 100)}% confidence
+                  </Badge>
+                </div>
                 {editingResolution === issue.id ? (
                   <div className="space-y-2">
                     <Textarea
                       value={editedResolutionText}
                       onChange={(e) => setEditedResolutionText(e.target.value)}
                       className="bg-blue-50 border-l-4 border-l-blue-400"
+                      rows={4}
                     />
                     <div className="flex space-x-2">
                       <Button size="sm" onClick={() => saveResolutionEdit(issue.id)}>
@@ -402,52 +548,52 @@ const IssueResolutionManager = () => {
                   </div>
                 ) : (
                   <div className="relative">
-                    <p className="text-sm bg-blue-50 p-3 rounded border-l-4 border-l-blue-400">
-                      {issue.pending_resolutions[0].resolution_text}
+                    <p className={`text-sm p-3 rounded border-l-4 ${hasExistingResolution ? 'bg-blue-50 border-l-blue-400' : 'bg-green-50 border-l-green-400'}`}>
+                      {resolutionText}
                     </p>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute top-2 right-2"
-                      onClick={() => startEditResolution(issue.id, issue.pending_resolutions[0].resolution_text)}
+                      onClick={() => startEditResolution(issue.id, resolutionText)}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
                 )}
               </div>
-            )}
 
-            <div className="flex flex-wrap gap-2 pt-4 border-t">
-              <Button
-                onClick={() => handleAcceptAsNew(issue)}
-                className="bg-green-600 hover:bg-green-700 flex items-center"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Accept as New Issue
-              </Button>
-              
-              <Button
-                onClick={() => handleMapToExisting(issue)}
-                variant="outline"
-                className="flex items-center"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Map to Existing Issue
-              </Button>
-              
-              <Button
-                onClick={() => handleReject(issue.id, issue)}
-                variant="destructive"
-                className="flex items-center"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Reject
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
+                <Button
+                  onClick={() => handleAcceptAsNew(issue)}
+                  className="bg-green-600 hover:bg-green-700 flex items-center"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Accept as New Issue
+                </Button>
+                
+                <Button
+                  onClick={() => handleMapToExisting(issue)}
+                  variant="outline"
+                  className="flex items-center"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Map to Existing Issue
+                </Button>
+                
+                <Button
+                  onClick={() => handleReject(issue.id, issue)}
+                  variant="destructive"
+                  className="flex items-center"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
