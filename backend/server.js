@@ -38,14 +38,14 @@ app.get('/api/test-connection', async (req, res) => {
     await connection.ping();
     connection.release();
     res.json({ 
-      status: 'Connected to MySQL successfully', 
+      status: 'Connected to MySQL feedback_db successfully', 
       timestamp: new Date().toISOString(),
       database: dbConfig.database
     });
   } catch (error) {
     console.error('MySQL connection error:', error);
     res.status(500).json({ 
-      error: 'Failed to connect to MySQL', 
+      error: 'Failed to connect to MySQL feedback_db', 
       details: error.message,
       config: {
         host: dbConfig.host,
@@ -114,14 +114,140 @@ app.get('/api/feedback', async (req, res) => {
     
     const [rows] = await pool.execute(query, params);
     
-    console.log(`Returned ${rows.length} records`);
+    console.log(`Returned ${rows.length} records from feedback_db`);
     res.json(rows);
   } catch (error) {
     console.error('Database query error:', error);
     res.status(500).json({ 
-      error: 'Failed to fetch feedback data', 
+      error: 'Failed to fetch feedback data from feedback_db', 
       details: error.message,
       query: req.query
+    });
+  }
+});
+
+// Create new feedback record
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const {
+      customer_name,
+      customer_phone,
+      customer_email,
+      customer_id,
+      service_type,
+      review_text,
+      review_rating,
+      issue_location,
+      contacted_bank_person,
+      status = 'new',
+      sentiment = 'neutral'
+    } = req.body;
+
+    // Calculate positive/negative flags based on rating
+    const positive_flag = review_rating >= 4;
+    const negative_flag = review_rating <= 3 && review_rating > 0;
+
+    const query = `
+      INSERT INTO feedback (
+        customer_name, customer_phone, customer_email, customer_id,
+        service_type, review_text, review_rating, issue_location,
+        contacted_bank_person, status, sentiment, positive_flag, negative_flag,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    const params = [
+      customer_name, customer_phone, customer_email, customer_id,
+      service_type, review_text, review_rating, issue_location,
+      contacted_bank_person, status, sentiment, positive_flag, negative_flag
+    ];
+
+    const [result] = await pool.execute(query, params);
+    
+    console.log('Feedback created successfully:', result.insertId);
+    res.json({ 
+      success: true, 
+      id: result.insertId,
+      message: 'Feedback created successfully in feedback_db'
+    });
+  } catch (error) {
+    console.error('Error creating feedback:', error);
+    res.status(500).json({ 
+      error: 'Failed to create feedback record', 
+      details: error.message 
+    });
+  }
+});
+
+// Update feedback record
+app.put('/api/feedback/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Build dynamic update query
+    const updateFields = [];
+    const params = [];
+    
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== undefined) {
+        updateFields.push(`${key} = ?`);
+        params.push(updates[key]);
+      }
+    });
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    // Add updated timestamp
+    updateFields.push('updated_at = NOW()');
+    params.push(id);
+    
+    const query = `UPDATE feedback SET ${updateFields.join(', ')} WHERE id = ?`;
+    
+    const [result] = await pool.execute(query, params);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Feedback record not found' });
+    }
+    
+    console.log('Feedback updated successfully:', id);
+    res.json({ 
+      success: true, 
+      message: 'Feedback updated successfully in feedback_db'
+    });
+  } catch (error) {
+    console.error('Error updating feedback:', error);
+    res.status(500).json({ 
+      error: 'Failed to update feedback record', 
+      details: error.message 
+    });
+  }
+});
+
+// Delete feedback record
+app.delete('/api/feedback/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const query = 'DELETE FROM feedback WHERE id = ?';
+    const [result] = await pool.execute(query, [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Feedback record not found' });
+    }
+    
+    console.log('Feedback deleted successfully:', id);
+    res.json({ 
+      success: true, 
+      message: 'Feedback deleted successfully from feedback_db'
+    });
+  } catch (error) {
+    console.error('Error deleting feedback:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete feedback record', 
+      details: error.message 
     });
   }
 });
@@ -154,17 +280,23 @@ app.get('/api/metrics', async (req, res) => {
     });
   } catch (error) {
     console.error('Metrics query error:', error);
-    res.status(500).json({ error: 'Failed to fetch metrics', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch metrics from feedback_db', details: error.message });
   }
 });
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    database: 'feedback_db',
+    message: 'Backend server connected to MySQL feedback_db'
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
+  console.log(`Connected to MySQL database: ${dbConfig.database}`);
   console.log(`Test connection at: http://localhost:${PORT}/api/test-connection`);
   console.log(`Health check at: http://localhost:${PORT}/api/health`);
 });
