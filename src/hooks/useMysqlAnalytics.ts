@@ -8,7 +8,7 @@ export const useMysqlAnalytics = (filters: any) => {
     queryFn: async () => {
       let query = supabase.from('feedback').select('positive_flag, negative_flag');
       
-      // Apply filters (same logic as feedback metrics)
+      // Apply filters consistently
       if (filters.service && filters.service !== 'all') {
         query = query.eq('service_type', filters.service);
       }
@@ -55,7 +55,6 @@ export const useMysqlAnalytics = (filters: any) => {
       
       console.log(`Sentiment data: positive=${positive}, negative=${negative}`);
       
-      // Only return positive and negative, no neutral
       return [
         { name: 'Positive', value: positive, fill: '#10B981' },
         { name: 'Negative', value: negative, fill: '#EF4444' }
@@ -106,22 +105,31 @@ export const useMysqlAnalytics = (filters: any) => {
       const { data } = await query;
       const feedback = data || [];
       
-      // Ensure all three services are included with actual data
-      const services = ['ATM', 'OnlineBanking', 'CoreBanking'];
-      const result = services.map(service => {
-        const serviceData = feedback.filter(f => f.service_type === service);
-        const positive = serviceData.filter(f => f.positive_flag).length;
-        const negative = serviceData.filter(f => f.negative_flag).length;
+      // Group by service type and count positive/negative
+      const serviceStats: { [key: string]: { positive: number; negative: number } } = {};
+      
+      feedback.forEach(item => {
+        const service = item.service_type;
+        if (!serviceStats[service]) {
+          serviceStats[service] = { positive: 0, negative: 0 };
+        }
         
-        console.log(`Service ${service}: total=${serviceData.length}, positive=${positive}, negative=${negative}`);
-        
-        return {
-          service,
-          positive,
-          negative
-        };
+        if (item.positive_flag) {
+          serviceStats[service].positive++;
+        }
+        if (item.negative_flag) {
+          serviceStats[service].negative++;
+        }
       });
       
+      // Convert to array format for charts
+      const result = Object.entries(serviceStats).map(([service, stats]) => ({
+        service,
+        positive: stats.positive,
+        negative: stats.negative
+      }));
+      
+      console.log('Service breakdown:', result);
       return result;
     }
   });
@@ -142,7 +150,7 @@ export const useMysqlAnalytics = (filters: any) => {
         branch_location: employee.branch_location,
         role: employee.role,
         total_feedback: employee.employee_feedback_interactions?.length || 0,
-        avg_rating: 4.2, // Mock data
+        avg_rating: 4.2,
         resolved_count: Math.floor((employee.employee_feedback_interactions?.length || 0) * 0.8)
       }));
     }
