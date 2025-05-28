@@ -147,6 +147,7 @@ app.post('/api/feedback', async (req, res) => {
       review_rating,
       issue_location,
       contacted_bank_person,
+      detected_issues = [],
       status = 'new',
       sentiment = 'neutral'
     } = req.body;
@@ -155,27 +156,32 @@ app.post('/api/feedback', async (req, res) => {
     const positive_flag = review_rating >= 4;
     const negative_flag = review_rating <= 3 && review_rating > 0;
 
+    // Convert detected_issues array to JSON string for MySQL storage
+    const detectedIssuesJson = JSON.stringify(detected_issues);
+
     const query = `
       INSERT INTO feedback (
         customer_name, customer_phone, customer_email, customer_id,
         service_type, review_text, review_rating, issue_location,
-        contacted_bank_person, status, sentiment, positive_flag, negative_flag,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        contacted_bank_person, detected_issues, status, sentiment, 
+        positive_flag, negative_flag, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
     const params = [
       customer_name, customer_phone, customer_email, customer_id,
       service_type, review_text, review_rating, issue_location,
-      contacted_bank_person, status, sentiment, positive_flag, negative_flag
+      contacted_bank_person, detectedIssuesJson, status, sentiment, 
+      positive_flag, negative_flag
     ];
 
     const [result] = await pool.execute(query, params);
     
-    console.log('Feedback created successfully:', result.insertId);
+    console.log('Feedback created successfully with detected issues:', detected_issues);
     res.json({ 
       success: true, 
       id: result.insertId,
+      detected_issues: detected_issues,
       message: 'Feedback created successfully in feedback_db'
     });
   } catch (error) {

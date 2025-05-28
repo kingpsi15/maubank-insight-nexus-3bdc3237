@@ -107,8 +107,15 @@ class MySQLService {
       }
 
       const data = await response.json();
-      console.log(`Fetched ${data.length} records from MySQL feedback_db`);
-      return data;
+      
+      // Parse detected_issues JSON string back to array for each record
+      const processedData = data.map((record: any) => ({
+        ...record,
+        detected_issues: record.detected_issues ? JSON.parse(record.detected_issues) : []
+      }));
+      
+      console.log(`Fetched ${processedData.length} records from MySQL feedback_db`);
+      return processedData;
     } catch (error) {
       console.error('Error fetching MySQL feedback data:', error);
       return [];
@@ -129,7 +136,8 @@ class MySQLService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      console.log('Feedback created successfully in MySQL');
+      const result = await response.json();
+      console.log('Feedback created successfully in MySQL with detected issues:', result.detected_issues);
       return true;
     } catch (error) {
       console.error('Error creating feedback in MySQL:', error);
