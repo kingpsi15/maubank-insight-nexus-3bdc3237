@@ -446,7 +446,10 @@ const IssueResolutionManager = () => {
                   <h4 className="font-semibold">
                     {hasExistingResolution ? 'AI-Generated Resolution:' : 'Recommended Resolution:'}
                   </h4>
-                  <Badge className={getConfidenceColor(resolutionConfidence)} variant="outline" className="ml-2">
+                  <Badge 
+                    className={`${getConfidenceColor(resolutionConfidence)} ml-2`}
+                    variant="outline"
+                  >
                     {Math.round(resolutionConfidence * 100)}% confidence
                   </Badge>
                 </div>
