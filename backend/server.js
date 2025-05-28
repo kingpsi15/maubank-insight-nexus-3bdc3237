@@ -7,11 +7,19 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Middleware - Updated CORS configuration
 app.use(cors({
-  origin: [process.env.CORS_ORIGIN, 'http://localhost:5173', 'http://localhost:3000'],
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://7f2d692c-8d5a-4c52-9a62-393244085c35.lovableproject.com',
+    process.env.CORS_ORIGIN
+  ].filter(Boolean),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
 // MySQL connection configuration
