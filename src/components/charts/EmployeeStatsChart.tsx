@@ -1,49 +1,36 @@
+
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { useAnalytics } from '@/hooks/useAnalytics';
+import { useQuery } from '@tanstack/react-query';
+import { employeeService } from '@/services';
 
 interface EmployeeStatsChartProps {
   filters?: any;
 }
 
 const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} }) => {
-  const { isLoading } = useAnalytics(filters);
-
-  // Mock employee data for now since we don't have the MySQL hook working
-  const employeeData = [
-    {
-      employee_name: "Ahmad Rahman",
-      department: "Customer Service",
-      branch_location: "Kuala Lumpur",
-      role: "Customer Rep",
-      total_feedback: 45,
-      avg_rating: 4.2,
-      resolved_count: 38
-    },
-    {
-      employee_name: "Siti Nurhaliza",
-      department: "IT Support",
-      branch_location: "Selangor",
-      role: "Technical Support",
-      total_feedback: 32,
-      avg_rating: 4.5,
-      resolved_count: 30
-    },
-    {
-      employee_name: "Raj Kumar",
-      department: "Operations",
-      branch_location: "Penang",
-      role: "Operations Manager",
-      total_feedback: 28,
-      avg_rating: 4.1,
-      resolved_count: 25
-    }
-  ];
+  // Fetch real employee data from database
+  const { data: employeeData = [], isLoading, error } = useQuery({
+    queryKey: ['employees', filters],
+    queryFn: () => employeeService.getAll(filters),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
 
   if (isLoading) {
     return (
       <div className="h-80 flex items-center justify-center">
         <div className="text-gray-500">Loading employee data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <div className="text-red-500">Failed to load employee data</div>
       </div>
     );
   }
@@ -67,7 +54,7 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
       
       return (
         <div className="bg-white p-3 border rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900 mb-2">{data.employee_name}</p>
+          <p className="font-medium text-gray-900 mb-2">{data.name}</p>
           <div className="space-y-1">
             <p className="text-sm text-blue-600">
               <span className="font-medium">Department:</span> {data.department}
@@ -79,13 +66,13 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
               <span className="font-medium">Role:</span> {data.role}
             </p>
             <p className="text-sm text-orange-600">
-              <span className="font-medium">Total Feedback:</span> {data.total_feedback}
+              <span className="font-medium">Total Feedback:</span> {data.total_feedback || 0}
             </p>
             <p className="text-sm text-indigo-600">
-              <span className="font-medium">Avg Rating:</span> {data.avg_rating?.toFixed(1)}
+              <span className="font-medium">Avg Rating:</span> {data.avgRating?.toFixed(1) || 'N/A'}
             </p>
             <p className="text-sm text-green-600">
-              <span className="font-medium">Resolved:</span> {data.resolved_count}
+              <span className="font-medium">Resolved:</span> {data.resolvedIssues || 0}
             </p>
           </div>
         </div>
@@ -104,7 +91,7 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
-              dataKey="employee_name" 
+              dataKey="name" 
               tick={{ fontSize: 10, textAnchor: 'end' }}
               height={100}
               interval={0}
@@ -130,18 +117,18 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
         <div className="space-y-2 max-h-40 overflow-y-auto">
           {employeeData.map((employee, index) => {
             const resolutionRate = employee.total_feedback > 0 ? 
-              ((employee.resolved_count / employee.total_feedback) * 100).toFixed(1) : '0';
+              ((employee.resolvedIssues / employee.total_feedback) * 100).toFixed(1) : '0';
             
             return (
               <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{employee.employee_name}</p>
+                  <p className="text-sm font-medium text-gray-900">{employee.name}</p>
                   <p className="text-xs text-gray-500">{employee.department} - {employee.branch_location}</p>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-blue-600">{employee.total_feedback} feedback</span>
+                  <span className="text-sm font-bold text-blue-600">{employee.total_feedback || 0} feedback</span>
                   <span className="text-xs text-green-600">{resolutionRate}% resolved</span>
-                  <span className="text-xs text-orange-600">★ {employee.avg_rating?.toFixed(1)}</span>
+                  <span className="text-xs text-orange-600">★ {employee.avgRating?.toFixed(1) || 'N/A'}</span>
                 </div>
               </div>
             );

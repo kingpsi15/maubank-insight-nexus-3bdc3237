@@ -6,71 +6,60 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Star, TrendingUp, Users, CheckCircle } from 'lucide-react';
 import EmployeePerformanceChart from '@/components/charts/EmployeePerformanceChart';
+import { useQuery } from '@tanstack/react-query';
+import { employeeService } from '@/services';
 
 const BankEmployeeAnalytics = () => {
-  // Mock employee data
-  const employees = [
-    {
-      id: 'EMP001',
-      name: 'Rajesh Kumar',
-      department: 'Customer Service',
-      contactedCount: 45,
-      avgRating: 4.2,
-      resolvedIssues: 38,
-      resolutionRate: 84.4,
-      responseTime: '2.3 hrs',
-      location: 'Mumbai',
-      status: 'active'
-    },
-    {
-      id: 'EMP002', 
-      name: 'Priya Sharma',
-      department: 'Technical Support',
-      contactedCount: 67,
-      avgRating: 4.6,
-      resolvedIssues: 61,
-      resolutionRate: 91.0,
-      responseTime: '1.8 hrs',
-      location: 'Delhi',
-      status: 'active'
-    },
-    {
-      id: 'EMP003',
-      name: 'Amit Patel',
-      department: 'Branch Operations',
-      contactedCount: 32,
-      avgRating: 3.8,
-      resolvedIssues: 24,
-      resolutionRate: 75.0,
-      responseTime: '3.1 hrs',
-      location: 'Bangalore',
-      status: 'active'
-    },
-    {
-      id: 'EMP004',
-      name: 'Sneha Reddy',
-      department: 'Digital Banking',
-      contactedCount: 89,
-      avgRating: 4.4,
-      resolvedIssues: 78,
-      resolutionRate: 87.6,
-      responseTime: '2.0 hrs',
-      location: 'Hyderabad',
-      status: 'active'
-    },
-    {
-      id: 'EMP005',
-      name: 'Vikram Singh',
-      department: 'ATM Operations',
-      contactedCount: 28,
-      avgRating: 4.1,
-      resolvedIssues: 23,
-      resolutionRate: 82.1,
-      responseTime: '2.7 hrs',
-      location: 'Chennai',
-      status: 'active'
-    }
-  ];
+  // Fetch real employee data from database
+  const { data: employees = [], isLoading, error } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => employeeService.getAll(),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading employee data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium text-red-800">
+                Failed to load employee data. Please check your database connection.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!employees || employees.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <p className="text-gray-600">No employee data available. Please add employee records to the database.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const getPerformanceBadge = (rating: number) => {
     if (rating >= 4.5) return { label: 'Excellent', color: 'bg-green-100 text-green-800' };
@@ -82,6 +71,15 @@ const BankEmployeeAnalytics = () => {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  // Calculate aggregate statistics from real data
+  const avgRating = employees.length > 0 ? 
+    employees.reduce((sum, emp) => sum + (emp.avgRating || 0), 0) / employees.length : 0;
+  
+  const totalContacts = employees.reduce((sum, emp) => sum + (emp.contactedCount || 0), 0);
+  
+  const avgResolutionRate = employees.length > 0 ? 
+    employees.reduce((sum, emp) => sum + (emp.resolutionRate || 0), 0) / employees.length : 0;
 
   return (
     <div className="space-y-6">
@@ -108,9 +106,7 @@ const BankEmployeeAnalytics = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(employees.reduce((sum, emp) => sum + emp.avgRating, 0) / employees.length).toFixed(1)}
-            </div>
+            <div className="text-2xl font-bold">{avgRating.toFixed(1)}</div>
             <p className="text-green-100 text-sm">Overall performance</p>
           </CardContent>
         </Card>
@@ -123,9 +119,7 @@ const BankEmployeeAnalytics = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round(employees.reduce((sum, emp) => sum + emp.resolutionRate, 0) / employees.length)}%
-            </div>
+            <div className="text-2xl font-bold">{Math.round(avgResolutionRate)}%</div>
             <p className="text-purple-100 text-sm">Average across team</p>
           </CardContent>
         </Card>
@@ -138,9 +132,7 @@ const BankEmployeeAnalytics = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {employees.reduce((sum, emp) => sum + emp.contactedCount, 0)}
-            </div>
+            <div className="text-2xl font-bold">{totalContacts}</div>
             <p className="text-orange-100 text-sm">This month</p>
           </CardContent>
         </Card>
@@ -166,7 +158,7 @@ const BankEmployeeAnalytics = () => {
         <CardContent>
           <div className="space-y-4">
             {employees.map((employee) => {
-              const performanceBadge = getPerformanceBadge(employee.avgRating);
+              const performanceBadge = getPerformanceBadge(employee.avgRating || 0);
               
               return (
                 <Card key={employee.id} className="p-4">
@@ -181,7 +173,7 @@ const BankEmployeeAnalytics = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="font-semibold text-lg">{employee.name}</h3>
-                          <p className="text-sm text-gray-600">{employee.department} • {employee.location}</p>
+                          <p className="text-sm text-gray-600">{employee.department} • {employee.branch_location}</p>
                         </div>
                         <Badge className={performanceBadge.color}>
                           {performanceBadge.label}
@@ -190,27 +182,27 @@ const BankEmployeeAnalytics = () => {
 
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-blue-600">{employee.contactedCount}</div>
+                          <div className="text-xl font-bold text-blue-600">{employee.contactedCount || 0}</div>
                           <div className="text-xs text-gray-600">Contacts</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-green-600">{employee.avgRating.toFixed(1)}</div>
+                          <div className="text-xl font-bold text-green-600">{(employee.avgRating || 0).toFixed(1)}</div>
                           <div className="text-xs text-gray-600">Avg Rating</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-purple-600">{employee.resolvedIssues}</div>
+                          <div className="text-xl font-bold text-purple-600">{employee.resolvedIssues || 0}</div>
                           <div className="text-xs text-gray-600">Resolved</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-orange-600">{employee.resolutionRate}%</div>
+                          <div className="text-xl font-bold text-orange-600">{(employee.resolutionRate || 0).toFixed(1)}%</div>
                           <div className="text-xs text-gray-600">Success Rate</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-red-600">{employee.responseTime}</div>
+                          <div className="text-xl font-bold text-red-600">{employee.responseTime || 'N/A'}</div>
                           <div className="text-xs text-gray-600">Avg Response</div>
                         </div>
                       </div>
@@ -218,9 +210,9 @@ const BankEmployeeAnalytics = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Resolution Rate</span>
-                          <span>{employee.resolutionRate}%</span>
+                          <span>{(employee.resolutionRate || 0).toFixed(1)}%</span>
                         </div>
-                        <Progress value={employee.resolutionRate} className="h-2" />
+                        <Progress value={employee.resolutionRate || 0} className="h-2" />
                       </div>
                     </div>
                   </div>
