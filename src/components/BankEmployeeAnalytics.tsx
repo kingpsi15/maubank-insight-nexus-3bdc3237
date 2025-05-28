@@ -10,10 +10,10 @@ import { useQuery } from '@tanstack/react-query';
 import { employeeService } from '@/services';
 
 const BankEmployeeAnalytics = () => {
-  // Fetch real employee data from database
-  const { data: employees = [], isLoading, error } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => employeeService.getAll(),
+  // Fetch employee statistics from database
+  const { data: employeeStats = [], isLoading, error } = useQuery({
+    queryKey: ['employee-stats'],
+    queryFn: () => employeeService.getEmployeeStats(),
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
@@ -47,13 +47,13 @@ const BankEmployeeAnalytics = () => {
     );
   }
 
-  if (!employees || employees.length === 0) {
+  if (!employeeStats || employeeStats.length === 0) {
     return (
       <div className="space-y-6">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
-              <p className="text-gray-600">No employee data available. Please add employee records to the database.</p>
+              <p className="text-gray-600">No employee data available. Please add employee records and feedback interactions to the database.</p>
             </div>
           </CardContent>
         </Card>
@@ -72,14 +72,17 @@ const BankEmployeeAnalytics = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  // Calculate aggregate statistics from real data
-  const avgRating = employees.length > 0 ? 
-    employees.reduce((sum, emp) => sum + (emp.avgRating || 0), 0) / employees.length : 0;
+  // Calculate aggregate statistics from employee stats
+  const avgRating = employeeStats.length > 0 ? 
+    employeeStats.reduce((sum: number, emp: any) => sum + (emp.avg_rating || 0), 0) / employeeStats.length : 0;
   
-  const totalContacts = employees.reduce((sum, emp) => sum + (emp.contactedCount || 0), 0);
+  const totalContacts = employeeStats.reduce((sum: number, emp: any) => sum + (emp.contacted_count || 0), 0);
   
-  const avgResolutionRate = employees.length > 0 ? 
-    employees.reduce((sum, emp) => sum + (emp.resolutionRate || 0), 0) / employees.length : 0;
+  const avgResolutionRate = employeeStats.length > 0 ? 
+    employeeStats.reduce((sum: number, emp: any) => {
+      const rate = emp.total_interactions > 0 ? (emp.resolved_count / emp.total_interactions) * 100 : 0;
+      return sum + rate;
+    }, 0) / employeeStats.length : 0;
 
   return (
     <div className="space-y-6">
@@ -93,7 +96,7 @@ const BankEmployeeAnalytics = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
+            <div className="text-2xl font-bold">{employeeStats.length}</div>
             <p className="text-blue-100 text-sm">Currently handling feedback</p>
           </CardContent>
         </Card>
@@ -157,11 +160,13 @@ const BankEmployeeAnalytics = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {employees.map((employee) => {
-              const performanceBadge = getPerformanceBadge(employee.avgRating || 0);
+            {employeeStats.map((employee: any) => {
+              const resolutionRate = employee.total_interactions > 0 ? 
+                (employee.resolved_count / employee.total_interactions) * 100 : 0;
+              const performanceBadge = getPerformanceBadge(employee.avg_rating || 0);
               
               return (
-                <Card key={employee.id} className="p-4">
+                <Card key={employee.employee_id} className="p-4">
                   <div className="flex items-start space-x-4">
                     <Avatar className="w-12 h-12">
                       <AvatarFallback className="bg-blue-100 text-blue-800 font-semibold">
@@ -182,27 +187,27 @@ const BankEmployeeAnalytics = () => {
 
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-blue-600">{employee.contactedCount || 0}</div>
+                          <div className="text-xl font-bold text-blue-600">{employee.contacted_count || 0}</div>
                           <div className="text-xs text-gray-600">Contacts</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-green-600">{(employee.avgRating || 0).toFixed(1)}</div>
+                          <div className="text-xl font-bold text-green-600">{(employee.avg_rating || 0).toFixed(1)}</div>
                           <div className="text-xs text-gray-600">Avg Rating</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-purple-600">{employee.resolvedIssues || 0}</div>
+                          <div className="text-xl font-bold text-purple-600">{employee.resolved_count || 0}</div>
                           <div className="text-xs text-gray-600">Resolved</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-orange-600">{(employee.resolutionRate || 0).toFixed(1)}%</div>
+                          <div className="text-xl font-bold text-orange-600">{resolutionRate.toFixed(1)}%</div>
                           <div className="text-xs text-gray-600">Success Rate</div>
                         </div>
                         
                         <div className="text-center p-3 bg-gray-50 rounded-lg">
-                          <div className="text-xl font-bold text-red-600">{employee.responseTime || 'N/A'}</div>
+                          <div className="text-xl font-bold text-red-600">N/A</div>
                           <div className="text-xs text-gray-600">Avg Response</div>
                         </div>
                       </div>
@@ -210,9 +215,9 @@ const BankEmployeeAnalytics = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Resolution Rate</span>
-                          <span>{(employee.resolutionRate || 0).toFixed(1)}%</span>
+                          <span>{resolutionRate.toFixed(1)}%</span>
                         </div>
-                        <Progress value={employee.resolutionRate || 0} className="h-2" />
+                        <Progress value={resolutionRate} className="h-2" />
                       </div>
                     </div>
                   </div>

@@ -9,10 +9,10 @@ interface EmployeeStatsChartProps {
 }
 
 const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} }) => {
-  // Fetch real employee data from database
-  const { data: employeeData = [], isLoading, error } = useQuery({
-    queryKey: ['employees', filters],
-    queryFn: () => employeeService.getAll(filters),
+  // Fetch employee statistics from database
+  const { data: employeeStats = [], isLoading, error } = useQuery({
+    queryKey: ['employee-stats', filters],
+    queryFn: () => employeeService.getEmployeeStats(filters),
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
@@ -35,7 +35,7 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
     );
   }
 
-  if (!employeeData || employeeData.length === 0) {
+  if (!employeeStats || employeeStats.length === 0) {
     return (
       <div className="h-80 flex items-center justify-center">
         <div className="text-gray-500">No employee data available</div>
@@ -62,17 +62,17 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
             <p className="text-sm text-green-600">
               <span className="font-medium">Branch:</span> {data.branch_location}
             </p>
-            <p className="text-sm text-purple-600">
-              <span className="font-medium">Role:</span> {data.role}
-            </p>
             <p className="text-sm text-orange-600">
-              <span className="font-medium">Total Feedback:</span> {data.total_feedback || 0}
+              <span className="font-medium">Total Interactions:</span> {data.total_interactions || 0}
             </p>
             <p className="text-sm text-indigo-600">
-              <span className="font-medium">Avg Rating:</span> {data.avgRating?.toFixed(1) || 'N/A'}
+              <span className="font-medium">Avg Rating:</span> {data.avg_rating?.toFixed(1) || 'N/A'}
             </p>
             <p className="text-sm text-green-600">
-              <span className="font-medium">Resolved:</span> {data.resolvedIssues || 0}
+              <span className="font-medium">Resolved:</span> {data.resolved_count || 0}
+            </p>
+            <p className="text-sm text-purple-600">
+              <span className="font-medium">Contacted:</span> {data.contacted_count || 0}
             </p>
           </div>
         </div>
@@ -86,7 +86,7 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
-            data={employeeData} 
+            data={employeeStats} 
             margin={{ top: 20, right: 30, left: 20, bottom: 100 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
@@ -99,11 +99,11 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
             />
             <YAxis 
               tick={{ fontSize: 12 }}
-              label={{ value: 'Feedback Count', angle: -90, position: 'insideLeft' }}
+              label={{ value: 'Interaction Count', angle: -90, position: 'insideLeft' }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="total_feedback" name="Total Feedback">
-              {employeeData.map((entry, index) => (
+            <Bar dataKey="total_interactions" name="Total Interactions">
+              {employeeStats.map((entry: any, index: number) => (
                 <Cell key={`cell-${index}`} fill={getBarColor(index)} />
               ))}
             </Bar>
@@ -115,9 +115,9 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
       <div className="mt-4">
         <h4 className="text-lg font-semibold mb-3">Employee Performance Summary</h4>
         <div className="space-y-2 max-h-40 overflow-y-auto">
-          {employeeData.map((employee, index) => {
-            const resolutionRate = employee.total_feedback > 0 ? 
-              ((employee.resolvedIssues / employee.total_feedback) * 100).toFixed(1) : '0';
+          {employeeStats.map((employee: any, index: number) => {
+            const resolutionRate = employee.total_interactions > 0 ? 
+              ((employee.resolved_count / employee.total_interactions) * 100).toFixed(1) : '0';
             
             return (
               <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
@@ -126,9 +126,9 @@ const EmployeeStatsChart: React.FC<EmployeeStatsChartProps> = ({ filters = {} })
                   <p className="text-xs text-gray-500">{employee.department} - {employee.branch_location}</p>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-blue-600">{employee.total_feedback || 0} feedback</span>
+                  <span className="text-sm font-bold text-blue-600">{employee.total_interactions || 0} interactions</span>
                   <span className="text-xs text-green-600">{resolutionRate}% resolved</span>
-                  <span className="text-xs text-orange-600">★ {employee.avgRating?.toFixed(1) || 'N/A'}</span>
+                  <span className="text-xs text-orange-600">★ {employee.avg_rating?.toFixed(1) || 'N/A'}</span>
                 </div>
               </div>
             );
