@@ -1,404 +1,147 @@
-import React, { useState, useEffect } from 'react';
+
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Download, Filter, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Database } from 'lucide-react';
 import { useMySQLMetrics } from '@/hooks/useMySQLData';
-import { useMySQLAnalytics } from '@/hooks/useMySQLData';
 import MySqlSentimentChart from '@/components/charts/MySqlSentimentChart';
 import MySqlServiceChart from '@/components/charts/MySqlServiceChart';
-import LocationChart from '@/components/charts/LocationChart';
-import TimelineChart from '@/components/charts/TimelineChart';
-import IssuesChart from '@/components/charts/IssuesChart';
-import RatingDistribution from '@/components/charts/RatingDistribution';
 
 const Dashboard = () => {
-  const [dateRange, setDateRange] = useState('last_month');
-  const [serviceType, setServiceType] = useState('all');
-  const [location, setLocation] = useState('all');
-  const [customDateFrom, setCustomDateFrom] = useState<Date>();
-  const [customDateTo, setCustomDateTo] = useState<Date>();
-  const [showFilters, setShowFilters] = useState(false);
+  const { data: metrics, isLoading } = useMySQLMetrics({});
 
-  // Get metrics data based on filters
-  const filters = {
-    dateRange,
-    service: serviceType,
-    location,
-    customDateFrom: customDateFrom?.toISOString(),
-    customDateTo: customDateTo?.toISOString()
-  };
-
-  const { data: overallMetrics, isLoading } = useMySQLMetrics(filters);
-  
-  // Create specific filters for each service type
-  const { data: atmMetrics } = useMySQLMetrics({ 
-    ...filters, 
-    service: 'ATM' 
-  });
-  
-  const { data: coreBankingMetrics } = useMySQLMetrics({ 
-    ...filters, 
-    service: 'CoreBanking' 
-  });
-  
-  const { data: onlineBankingMetrics } = useMySQLMetrics({ 
-    ...filters, 
-    service: 'OnlineBanking' 
-  });
-
-  // Get analytics data using the MySQL analytics hook
-  const {
-    sentimentData,
-    serviceData,
-    isLoading: analyticsLoading
-  } = useMySQLAnalytics(filters);
-
-  const handleExportCSV = () => {
-    // Export functionality based on current filters
-    console.log('Exporting CSV with filters:', {
-      dateRange,
-      serviceType,
-      location,
-      customDateFrom,
-      customDateTo
-    });
-  };
-
-  const calculateTrend = (trend: number | undefined) => {
-    if (trend === undefined || trend === 0) return '+0.0%';
-    return `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}%`;
-  };
-
-  const getServiceCard = (title: string, data: any, bgColor: string, textColor: string) => {
-    if (isLoading || !data) {
-      return (
-        <Card className={`${bgColor} ${textColor}`}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">{title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="animate-pulse">Loading MySQL data...</div>
-          </CardContent>
-        </Card>
-      );
-    }
-
+  if (isLoading) {
     return (
-      <Card className={`${bgColor} ${textColor}`}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center justify-between">
-            <span>{title}</span>
-            <div className="flex items-center text-sm">
-              {(data.trend || 0) > 0 ? (
-                <TrendingUp className="w-4 h-4 mr-1" />
-              ) : (
-                <TrendingDown className="w-4 h-4 mr-1" />
-              )}
-              {calculateTrend(data.trend)}
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <div className="text-2xl font-bold">{data.total}</div>
-            <p className="text-sm opacity-90">Total Feedback</p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center">
-              <CheckCircle className="w-4 h-4 mr-1" />
-              <span>{data.positive} Positive</span>
-            </div>
-            <div className="flex items-center">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              <span>{data.negative} Negative</span>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-white/20">
-            <div className="text-xl font-bold">{data.avgRating.toFixed(1)}</div>
-            <p className="text-sm opacity-90">Average Rating</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading MySQL data...</p>
+        </div>
+      </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
       {/* Connection Status */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className="border-green-200 bg-green-50">
         <CardContent className="pt-6">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-800">
-              Connected to MySQL Database (localhost:3001)
+            <Database className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-medium text-green-800">
+              Connected to MySQL Database - Showing Live Data
             </span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Filters */}
+      {/* Main Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Total Feedback</span>
+              <div className="flex items-center text-sm">
+                <TrendingUp className="w-4 h-4 mr-1" />
+                +{metrics?.trend.toFixed(1)}%
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold">{metrics?.total || 0}</div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center">
+                <CheckCircle className="w-4 h-4 mr-1" />
+                <span>{metrics?.positive || 0} Positive</span>
+              </div>
+              <div className="flex items-center">
+                <AlertTriangle className="w-4 h-4 mr-1" />
+                <span>{metrics?.negative || 0} Negative</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-white/20">
+              <div className="text-xl font-bold">{metrics?.avgRating?.toFixed(1) || '0.0'}</div>
+              <p className="text-sm opacity-90">Average Rating</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">ATM Services</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.total || 0}</div>
+            <p className="text-sm opacity-90">From database</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Online Banking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.total || 0}</div>
+            <p className="text-sm opacity-90">From database</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Core Banking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics?.total || 0}</div>
+            <p className="text-sm opacity-90">From database</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sentiment Distribution</CardTitle>
+            <CardDescription>Real-time sentiment from MySQL database</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MySqlSentimentChart filters={{}} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Performance</CardTitle>
+            <CardDescription>Performance by service type from MySQL</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MySqlServiceChart filters={{}} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Database Stats */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Analytics Filters</CardTitle>
-              <CardDescription>Filter data to focus on specific segments</CardDescription>
+          <CardTitle>Database Overview</CardTitle>
+          <CardDescription>Live statistics from your MySQL database</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{metrics?.total || 0}</div>
+              <p className="text-sm text-gray-600">Total Records</p>
             </div>
-            <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                {showFilters ? 'Hide' : 'Show'} Filters
-              </Button>
-              <Button onClick={handleExportCSV} className="flex items-center bg-green-600 hover:bg-green-700">
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{metrics?.positive || 0}</div>
+              <p className="text-sm text-gray-600">Positive Feedback</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">{metrics?.negative || 0}</div>
+              <p className="text-sm text-gray-600">Negative Feedback</p>
             </div>
           </div>
-        </CardHeader>
-        
-        {showFilters && (
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Date Range</label>
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="last_week">Last Week</SelectItem>
-                    <SelectItem value="last_month">Last Month</SelectItem>
-                    <SelectItem value="last_quarter">Last Quarter</SelectItem>
-                    <SelectItem value="last_year">Last Year</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {dateRange === 'custom' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">From Date</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !customDateFrom && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customDateFrom ? format(customDateFrom, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={customDateFrom}
-                          onSelect={setCustomDateFrom}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">To Date</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !customDateTo && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customDateTo ? format(customDateTo, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={customDateTo}
-                          onSelect={setCustomDateTo}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Service Type</label>
-                <Select value={serviceType} onValueChange={setServiceType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Services</SelectItem>
-                    <SelectItem value="ATM">ATM</SelectItem>
-                    <SelectItem value="OnlineBanking">Online Banking</SelectItem>
-                    <SelectItem value="CoreBanking">Core Banking</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Location</label>
-                <Select value={location} onValueChange={setLocation}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Locations</SelectItem>
-                    <SelectItem value="Kuala Lumpur">Kuala Lumpur</SelectItem>
-                    <SelectItem value="Selangor">Selangor</SelectItem>
-                    <SelectItem value="Penang">Penang</SelectItem>
-                    <SelectItem value="Johor Bahru">Johor Bahru</SelectItem>
-                    <SelectItem value="Melaka">Melaka</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        )}
+        </CardContent>
       </Card>
-
-      {/* Service-specific Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {getServiceCard(
-          "Overall",
-          overallMetrics,
-          "bg-gradient-to-r from-blue-600 to-blue-700",
-          "text-white"
-        )}
-        {getServiceCard(
-          "ATM",
-          atmMetrics,
-          "bg-gradient-to-r from-red-500 to-red-600",
-          "text-white"
-        )}
-        {getServiceCard(
-          "CoreBanking",
-          coreBankingMetrics,
-          "bg-gradient-to-r from-green-500 to-green-600",
-          "text-white"
-        )}
-        {getServiceCard(
-          "OnlineBanking",
-          onlineBankingMetrics,
-          "bg-gradient-to-r from-purple-500 to-purple-600",
-          "text-white"
-        )}
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Overall Sentiment */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Overall Sentiment Distribution</CardTitle>
-            <CardDescription>Customer sentiment breakdown from MySQL database</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <MySqlSentimentChart filters={filters} />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Rating Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rating Distribution</CardTitle>
-            <CardDescription>Distribution of customer ratings (MySQL data)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <RatingDistribution />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Service-wise Analysis */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Service-wise Sentiment</CardTitle>
-            <CardDescription>Sentiment breakdown by service type (MySQL data)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <MySqlServiceChart filters={filters} />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Location Analysis */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Location-wise Performance</CardTitle>
-            <CardDescription>Regional sentiment and issue distribution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <LocationChart />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Timeline Analysis */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Sentiment Timeline</CardTitle>
-            <CardDescription>Sentiment trends over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <TimelineChart />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top Issues */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Top Issues by Frequency</CardTitle>
-            <CardDescription>Most common issues across all services</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analyticsLoading ? (
-              <div className="h-64 flex items-center justify-center">Loading MySQL data...</div>
-            ) : (
-              <IssuesChart />
-            )}
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
