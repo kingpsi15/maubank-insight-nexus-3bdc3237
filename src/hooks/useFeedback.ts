@@ -45,7 +45,7 @@ export const useFeedback = (filters: any = {}) => {
   });
 
   const createMutation = useMutation({
-    mutationFn: mysqlService.createFeedback.bind(mysqlService),
+    mutationFn: (feedbackData: any) => mysqlService.createFeedback(feedbackData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mysql-feedback'] });
       queryClient.invalidateQueries({ queryKey: ['mysql-feedback-metrics'] });
@@ -62,7 +62,7 @@ export const useFeedback = (filters: any = {}) => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: mysqlService.deleteFeedback.bind(mysqlService),
+    mutationFn: (id: string) => mysqlService.deleteFeedback(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mysql-feedback'] });
       queryClient.invalidateQueries({ queryKey: ['mysql-feedback-metrics'] });
