@@ -1,48 +1,48 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { analyticsService } from '@/services';
+import { mysqlService } from '@/services/mysqlService';
 
 export const useAnalytics = (filters: any = {}) => {
   const queryOptions = {
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache results
+    staleTime: 0,
+    gcTime: 0,
     refetchOnMount: 'always' as const,
     refetchOnWindowFocus: true,
   };
 
   const { data: sentimentData, isLoading: sentimentLoading } = useQuery({
-    queryKey: ['analytics', 'sentiment', filters],
-    queryFn: () => analyticsService.getSentimentData(filters),
+    queryKey: ['mysql-analytics', 'sentiment', filters],
+    queryFn: () => mysqlService.getSentimentData(filters),
     ...queryOptions,
   });
 
   const { data: serviceData, isLoading: serviceLoading } = useQuery({
-    queryKey: ['analytics', 'service', filters],
-    queryFn: () => analyticsService.getServiceData(filters),
+    queryKey: ['mysql-analytics', 'service', filters],
+    queryFn: () => mysqlService.getServiceData(filters),
     ...queryOptions,
   });
 
   const { data: locationData, isLoading: locationLoading } = useQuery({
-    queryKey: ['analytics', 'location', filters],
-    queryFn: () => analyticsService.getLocationData(filters),
+    queryKey: ['mysql-analytics', 'location', filters],
+    queryFn: () => Promise.resolve([]), // MySQL service doesn't have location data yet
     ...queryOptions,
   });
 
   const { data: ratingData, isLoading: ratingLoading } = useQuery({
-    queryKey: ['analytics', 'rating', filters],
-    queryFn: () => analyticsService.getRatingDistribution(filters),
+    queryKey: ['mysql-analytics', 'rating', filters],
+    queryFn: () => Promise.resolve([]), // MySQL service doesn't have rating distribution yet
     ...queryOptions,
   });
 
   const { data: timelineData, isLoading: timelineLoading } = useQuery({
-    queryKey: ['analytics', 'timeline', filters],
-    queryFn: () => analyticsService.getTimelineData(filters),
+    queryKey: ['mysql-analytics', 'timeline', filters],
+    queryFn: () => Promise.resolve([]), // MySQL service doesn't have timeline data yet
     ...queryOptions,
   });
 
   const { data: issuesData, isLoading: issuesLoading } = useQuery({
-    queryKey: ['analytics', 'issues', filters],
-    queryFn: () => analyticsService.getTopIssues(filters),
+    queryKey: ['mysql-analytics', 'issues', filters],
+    queryFn: () => Promise.resolve([]), // MySQL service doesn't have issues data yet
     ...queryOptions,
   });
 
