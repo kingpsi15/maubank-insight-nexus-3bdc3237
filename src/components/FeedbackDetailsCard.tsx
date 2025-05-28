@@ -56,7 +56,24 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     const issues = feedback.detected_issues || [];
     const reviewText = feedback.review_text?.toLowerCase();
 
-    // Check for specific service types and issues
+    console.log('Generating resolution for:', { serviceType, issues, reviewText: reviewText.substring(0, 100) });
+
+    // Check for balance/minimum balance issues
+    if (reviewText?.includes('balance') || reviewText?.includes('minimum') || issues.some(issue => issue.toLowerCase().includes('balance'))) {
+      return "1. Review account terms and notify customers of changes in advance\n2. Provide clear communication about minimum balance requirements\n3. Offer alternative account types with lower balance requirements\n4. Implement grace period for existing customers\n5. Provide financial counseling to help customers maintain required balances";
+    }
+
+    // Check for queue/waiting time issues
+    if (reviewText?.includes('queue') || reviewText?.includes('wait') || reviewText?.includes('long') || issues.some(issue => issue.toLowerCase().includes('wait'))) {
+      return "1. Implement queue management system during peak hours\n2. Add more service counters if possible\n3. Train staff on efficient customer service\n4. Consider appointment-based services for complex transactions\n5. Provide estimated wait times to customers";
+    }
+
+    // Check for staff/service issues
+    if (reviewText?.includes('staff') || reviewText?.includes('service') || issues.some(issue => issue.toLowerCase().includes('service'))) {
+      return "1. Provide additional customer service training to staff\n2. Review and update service protocols\n3. Implement customer feedback system\n4. Conduct regular staff performance evaluations\n5. Recognize and reward excellent service";
+    }
+
+    // Check for specific service types
     if (serviceType?.includes('atm') || issues.some(issue => issue.toLowerCase().includes('atm'))) {
       return "1. Check ATM operational status and error logs\n2. Verify cash availability and card reader functionality\n3. If machine is faulty, place 'Out of Order' sign\n4. Direct customer to nearest working ATM\n5. Follow up with technical team for repair if needed";
     }
@@ -67,18 +84,6 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     
     if (serviceType?.includes('core') || issues.some(issue => issue.toLowerCase().includes('core'))) {
       return "1. Check core banking system status dashboard\n2. Document error details and customer information\n3. Contact technical operations team immediately\n4. Provide estimated resolution time to customer\n5. Follow up with customer once issue is resolved";
-    }
-    
-    if (reviewText?.includes('wait') || reviewText?.includes('queue') || issues.some(issue => issue.toLowerCase().includes('wait'))) {
-      return "1. Implement queue management system during peak hours\n2. Add more service counters if possible\n3. Train staff on efficient customer service\n4. Consider appointment-based services for complex transactions\n5. Provide estimated wait times to customers";
-    }
-    
-    if (reviewText?.includes('staff') || issues.some(issue => issue.toLowerCase().includes('service'))) {
-      return "1. Provide additional customer service training to staff\n2. Review and update service protocols\n3. Implement customer feedback system\n4. Conduct regular staff performance evaluations\n5. Recognize and reward excellent service";
-    }
-
-    if (reviewText?.includes('balance') || reviewText?.includes('minimum') || issues.some(issue => issue.toLowerCase().includes('balance'))) {
-      return "1. Review account terms and notify customers of changes in advance\n2. Provide clear communication about minimum balance requirements\n3. Offer alternative account types with lower balance requirements\n4. Implement grace period for existing customers\n5. Provide financial counseling to help customers maintain required balances";
     }
 
     if (issues.some(issue => issue.toLowerCase().includes('accessibility'))) {
@@ -158,6 +163,7 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
   }
 
   const recommendedResolution = generateResolutionRecommendation(feedback);
+  console.log('Generated resolution:', recommendedResolution);
 
   return (
     <Card className="w-full max-w-2xl">
@@ -210,10 +216,10 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
             </div>
           )}
           <Badge variant="outline">{feedback.service_type}</Badge>
-          <Badge className={getSentimentColor(feedback.sentiment)}>
+          <Badge className={`${feedback.sentiment === 'positive' ? 'bg-green-100 text-green-800' : feedback.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
             {feedback.sentiment}
           </Badge>
-          <Badge className={getStatusColor(feedback.status)}>
+          <Badge className={`${feedback.status === 'new' ? 'bg-blue-100 text-blue-800' : feedback.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : feedback.status === 'resolved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
             {feedback.status}
           </Badge>
         </div>
@@ -262,7 +268,7 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
           </div>
         )}
 
-        {/* Resolution Recommendation */}
+        {/* Resolution Recommendation - This is the missing section */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
