@@ -16,3 +16,4 @@ export { issueService } from './issueService';
 export { analyticsService } from './analyticsService';
 export { employeeService } from './employeeService';
 export { pendingIssueService } from './pendingIssueService';
+export { mysqlService } from './mysqlService';

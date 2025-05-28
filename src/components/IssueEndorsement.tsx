@@ -17,7 +17,7 @@ const IssueEndorsement = () => {
   const { toast } = useToast();
 
   // Fetch approved issues with resolution field
-  const { data: approvedIssues = [], isLoading: loadingApproved } = useQuery({
+  const { data: approvedIssues = [], isLoading: loadingApproved, error: approvedError } = useQuery({
     queryKey: ['approved-issues'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -29,11 +29,12 @@ const IssueEndorsement = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: isAuthenticated
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
   // Fetch rejected issues
-  const { data: rejectedIssues = [], isLoading: loadingRejected } = useQuery({
+  const { data: rejectedIssues = [], isLoading: loadingRejected, error: rejectedError } = useQuery({
     queryKey: ['rejected-issues'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -44,11 +45,12 @@ const IssueEndorsement = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: isAuthenticated
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
   // Fetch pending issues count
-  const { data: pendingCount = 0 } = useQuery({
+  const { data: pendingCount = 0, error: pendingError } = useQuery({
     queryKey: ['pending-issues-count'],
     queryFn: async () => {
       const { count, error } = await supabase
@@ -58,7 +60,8 @@ const IssueEndorsement = () => {
       if (error) throw error;
       return count || 0;
     },
-    enabled: isAuthenticated
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
   const handleLogout = () => {
@@ -81,6 +84,24 @@ const IssueEndorsement = () => {
           </CardHeader>
         </Card>
         <LoginForm />
+      </div>
+    );
+  }
+
+  // Show errors if any queries failed
+  if (approvedError || rejectedError || pendingError) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <span className="text-sm font-medium text-red-800">
+                Error loading data. Please check your connection and try again.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

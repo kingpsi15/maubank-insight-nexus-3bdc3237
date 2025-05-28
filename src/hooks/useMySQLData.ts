@@ -10,6 +10,7 @@ export const useMySQLFeedback = (filters: any = {}) => {
     gcTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    retry: 1,
   });
 };
 
@@ -21,6 +22,7 @@ export const useMySQLMetrics = (filters: any = {}) => {
     gcTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    retry: 1,
   });
 };
 
@@ -31,6 +33,7 @@ export const useMySQLAnalytics = (filters: any = {}) => {
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
+    retry: 1,
   });
 
   const serviceQuery = useQuery({
@@ -39,11 +42,13 @@ export const useMySQLAnalytics = (filters: any = {}) => {
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
+    retry: 1,
   });
 
   return {
     sentimentData: sentimentQuery.data,
     serviceData: serviceQuery.data,
     isLoading: sentimentQuery.isLoading || serviceQuery.isLoading,
+    error: sentimentQuery.error || serviceQuery.error,
   };
 };

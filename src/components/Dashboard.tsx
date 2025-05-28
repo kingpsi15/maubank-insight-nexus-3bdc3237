@@ -1,13 +1,13 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Database } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Database, AlertCircle } from 'lucide-react';
 import { useMySQLMetrics } from '@/hooks/useMySQLData';
 import MySqlSentimentChart from '@/components/charts/MySqlSentimentChart';
 import MySqlServiceChart from '@/components/charts/MySqlServiceChart';
 
 const Dashboard = () => {
-  const { data: metrics, isLoading } = useMySQLMetrics({});
+  const { data: metrics, isLoading, error } = useMySQLMetrics({});
 
   if (isLoading) {
     return (
@@ -16,6 +16,23 @@ const Dashboard = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-2 text-gray-600">Loading MySQL data...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <span className="text-sm font-medium text-red-800">
+                Failed to connect to MySQL Database. Please check your backend server.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -41,8 +58,12 @@ const Dashboard = () => {
             <CardTitle className="text-lg flex items-center justify-between">
               <span>Total Feedback</span>
               <div className="flex items-center text-sm">
-                <TrendingUp className="w-4 h-4 mr-1" />
-                +{metrics?.trend.toFixed(1)}%
+                {metrics?.trend && metrics.trend > 0 ? (
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 mr-1" />
+                )}
+                {metrics?.trend ? `${metrics.trend > 0 ? '+' : ''}${metrics.trend.toFixed(1)}%` : '0%'}
               </div>
             </CardTitle>
           </CardHeader>
@@ -67,31 +88,31 @@ const Dashboard = () => {
 
         <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">ATM Services</CardTitle>
+            <CardTitle className="text-lg">Resolved Issues</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.total || 0}</div>
-            <p className="text-sm opacity-90">From database</p>
+            <div className="text-2xl font-bold">{metrics?.resolved || 0}</div>
+            <p className="text-sm opacity-90">Successfully resolved</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Online Banking</CardTitle>
+            <CardTitle className="text-lg">Pending Issues</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.total || 0}</div>
-            <p className="text-sm opacity-90">From database</p>
+            <div className="text-2xl font-bold">{metrics?.pending || 0}</div>
+            <p className="text-sm opacity-90">Awaiting resolution</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Core Banking</CardTitle>
+            <CardTitle className="text-lg">Database Records</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics?.total || 0}</div>
-            <p className="text-sm opacity-90">From database</p>
+            <p className="text-sm opacity-90">Total entries</p>
           </CardContent>
         </Card>
       </div>
