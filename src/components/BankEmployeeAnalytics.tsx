@@ -73,13 +73,13 @@ const BankEmployeeAnalytics = () => {
   };
 
   // Calculate aggregate statistics from employee stats with proper type checking
-  const avgRating = employeeStats.length > 0 ? 
-    employeeStats.reduce((sum: number, emp: any) => sum + (Number(emp.avg_rating) || 0), 0) / employeeStats.length : 0;
+  const avgRating: number = employeeStats.length > 0 ? 
+    (employeeStats as any[]).reduce((sum: number, emp: any) => sum + (Number(emp.avg_rating) || 0), 0) / employeeStats.length : 0;
   
-  const totalContacts = employeeStats.reduce((sum: number, emp: any) => sum + (Number(emp.contacted_count) || 0), 0);
+  const totalContacts: number = (employeeStats as any[]).reduce((sum: number, emp: any) => sum + (Number(emp.contacted_count) || 0), 0);
   
-  const avgResolutionRate = employeeStats.length > 0 ? 
-    employeeStats.reduce((sum: number, emp: any) => {
+  const avgResolutionRate: number = employeeStats.length > 0 ? 
+    (employeeStats as any[]).reduce((sum: number, emp: any) => {
       const totalInteractions = Number(emp.total_interactions) || 0;
       const resolvedCount = Number(emp.resolved_count) || 0;
       const rate = totalInteractions > 0 ? (resolvedCount / totalInteractions) * 100 : 0;
@@ -162,7 +162,7 @@ const BankEmployeeAnalytics = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {employeeStats.map((employee: any) => {
+            {(employeeStats as any[]).map((employee: any) => {
               const totalInteractions = Number(employee.total_interactions) || 0;
               const resolvedCount = Number(employee.resolved_count) || 0;
               const resolutionRate = totalInteractions > 0 ? 
