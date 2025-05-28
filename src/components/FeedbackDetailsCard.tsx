@@ -77,6 +77,14 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
       return "1. Provide additional customer service training to staff\n2. Review and update service protocols\n3. Implement customer feedback system\n4. Conduct regular staff performance evaluations\n5. Recognize and reward excellent service";
     }
 
+    if (reviewText?.includes('balance') || reviewText?.includes('minimum') || issues.some(issue => issue.toLowerCase().includes('balance'))) {
+      return "1. Review account terms and notify customers of changes in advance\n2. Provide clear communication about minimum balance requirements\n3. Offer alternative account types with lower balance requirements\n4. Implement grace period for existing customers\n5. Provide financial counseling to help customers maintain required balances";
+    }
+
+    if (issues.some(issue => issue.toLowerCase().includes('accessibility'))) {
+      return "1. Conduct accessibility audit of branch facilities\n2. Install ramps and accessible entrances where needed\n3. Provide priority service counters for elderly and disabled customers\n4. Train staff on accessibility assistance protocols\n5. Implement digital alternatives for common transactions";
+    }
+
     // Default recommendation
     return "1. Acknowledge customer concern promptly\n2. Review issue with appropriate department\n3. Document incident for future reference\n4. Follow standard escalation procedures\n5. Provide regular updates to customer on resolution progress";
   };
