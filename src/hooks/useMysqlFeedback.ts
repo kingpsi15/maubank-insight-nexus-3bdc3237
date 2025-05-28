@@ -65,6 +65,7 @@ export const useMysqlFeedbackMetrics = (filters: any) => {
       }
       
       const feedback = data || [];
+      console.log(`Fetched ${feedback.length} feedback records for service: ${filters.service || 'all'}`);
       
       const total = feedback.length;
       const positive = feedback.filter(f => f.positive_flag).length;
@@ -84,6 +85,8 @@ export const useMysqlFeedbackMetrics = (filters: any) => {
       } else {
         trend = 3.7; // Overall positive trend
       }
+      
+      console.log(`Metrics for ${filters.service || 'all'}: total=${total}, positive=${positive}, negative=${negative}`);
       
       return {
         total,

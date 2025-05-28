@@ -8,7 +8,7 @@ export const useMysqlAnalytics = (filters: any) => {
     queryFn: async () => {
       let query = supabase.from('feedback').select('positive_flag, negative_flag');
       
-      // Apply filters (same logic as above)
+      // Apply filters (same logic as feedback metrics)
       if (filters.service && filters.service !== 'all') {
         query = query.eq('service_type', filters.service);
       }
@@ -52,6 +52,8 @@ export const useMysqlAnalytics = (filters: any) => {
       
       const positive = feedback.filter(f => f.positive_flag).length;
       const negative = feedback.filter(f => f.negative_flag).length;
+      
+      console.log(`Sentiment data: positive=${positive}, negative=${negative}`);
       
       // Only return positive and negative, no neutral
       return [
@@ -104,16 +106,23 @@ export const useMysqlAnalytics = (filters: any) => {
       const { data } = await query;
       const feedback = data || [];
       
-      // Ensure all three services are included
+      // Ensure all three services are included with actual data
       const services = ['ATM', 'OnlineBanking', 'CoreBanking'];
-      return services.map(service => {
+      const result = services.map(service => {
         const serviceData = feedback.filter(f => f.service_type === service);
+        const positive = serviceData.filter(f => f.positive_flag).length;
+        const negative = serviceData.filter(f => f.negative_flag).length;
+        
+        console.log(`Service ${service}: total=${serviceData.length}, positive=${positive}, negative=${negative}`);
+        
         return {
           service,
-          positive: serviceData.filter(f => f.positive_flag).length,
-          negative: serviceData.filter(f => f.negative_flag).length
+          positive,
+          negative
         };
       });
+      
+      return result;
     }
   });
 
