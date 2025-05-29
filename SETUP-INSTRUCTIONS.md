@@ -1,11 +1,10 @@
-
 # Complete Setup Instructions
 
 This project includes both frontend (React) and backend (Node.js + MySQL) components.
 
 ## Frontend Setup (Already Done)
 
-The frontend is ready to use with Lovable. It will automatically connect to your MySQL backend when available.
+The frontend is ready to use with MauBank Insight Nexus. It will automatically connect to your MySQL backend when available.
 
 ## Backend Setup
 
@@ -51,7 +50,7 @@ The frontend is ready to use with Lovable. It will automatically connect to your
 3. You should see a success message with database connection details
 
 ### Step 4: View Your Data
-1. Refresh your Lovable frontend
+1. Refresh your MauBank Insight Nexus frontend
 2. You should now see data from your MySQL database
 3. The dashboard will show "Connected to MySQL Database" indicator
 
@@ -74,7 +73,7 @@ The frontend is ready to use with Lovable. It will automatically connect to your
 ## File Structure
 ```
 project/
-├── frontend/ (Lovable React app)
+├── frontend/ (MauBank Insight Nexus React app)
 ├── backend/
 │   ├── server.js (Main API server)
 │   ├── scripts/
@@ -101,7 +100,7 @@ project/
 Send POST requests to the backend (you'll need to add POST endpoints)
 
 ## Production Deployment
-1. **Frontend**: Deploy through Lovable's publish feature
+1. **Frontend**: Deploy through MauBank's deployment pipeline
 2. **Backend**: Deploy to services like Heroku, Railway, or DigitalOcean
 3. **Database**: Use managed MySQL services like PlanetScale, AWS RDS, or similar
 4. Update environment variables for production URLs
