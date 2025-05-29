@@ -526,11 +526,260 @@ app.post('/api/import-csv', upload.single('csvFile'), async (req, res) => {
 // Retrieve pending issues
 app.get('/api/pending-issues', async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM pending_issues ORDER BY created_at DESC');
-    res.json(rows);
+    // Get all pending issues
+    const [pendingIssues] = await pool.execute(
+      'SELECT * FROM pending_issues ORDER BY created_at DESC'
+    );
+
+    // For each pending issue, get its resolutions and feedback data
+    const result = await Promise.all(pendingIssues.map(async (issue) => {
+      // Get resolutions for this issue
+      const [resolutions] = await pool.execute(
+        'SELECT id, resolution_text, confidence_score FROM pending_resolutions WHERE pending_issue_id = ?',
+        [issue.id]
+      );
+
+      // Get feedback data if it exists
+      let feedback = null;
+      if (issue.detected_from_feedback_id) {
+        const [feedbackRows] = await pool.execute(
+          'SELECT customer_name, review_text, issue_location FROM feedback WHERE id = ?',
+          [issue.detected_from_feedback_id]
+        );
+        if (feedbackRows.length > 0) {
+          feedback = feedbackRows[0];
+        }
+      }
+
+      return {
+        ...issue,
+        pending_resolutions: resolutions,
+        feedback
+      };
+    }));
+
+    res.json(result);
   } catch (error) {
     console.error('Error fetching pending issues:', error);
     res.status(500).json({ error: 'Failed to fetch pending issues', details: error.message });
+  }
+});
+
+// GET issues with optional status filter
+app.get('/api/issues', async (req, res) => {
+  try {
+    let query = 'SELECT id, title, category, description, feedback_count FROM issues';
+    const params = [];
+
+    if (req.query.status) {
+      query += ' WHERE status = ?';
+      params.push(req.query.status);
+    }
+
+    const [rows] = await pool.execute(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching issues:', error);
+    res.status(500).json({ error: 'Failed to fetch issues', details: error.message });
+  }
+});
+
+// POST new issue
+app.post('/api/issues', async (req, res) => {
+  try {
+    const {
+      title, description, category, resolution, status,
+      confidence_score, feedback_count, approved_by, approved_date
+    } = req.body;
+
+    const issueId = 'issue_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    
+    await pool.execute(
+      `INSERT INTO issues (
+        id, title, description, category, resolution, status,
+        confidence_score, feedback_count, approved_by, approved_date, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        issueId, title, description, category, resolution, status,
+        confidence_score, feedback_count, approved_by, approved_date
+      ]
+    );
+
+    res.json({ success: true, id: issueId });
+  } catch (error) {
+    console.error('Error creating issue:', error);
+    res.status(500).json({ error: 'Failed to create issue', details: error.message });
+  }
+});
+
+// DELETE pending issue
+app.delete('/api/pending-issues/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Delete associated resolutions first
+    await pool.execute(
+      'DELETE FROM pending_resolutions WHERE pending_issue_id = ?',
+      [id]
+    );
+    
+    // Then delete the pending issue
+    const [result] = await pool.execute(
+      'DELETE FROM pending_issues WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Pending issue not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting pending issue:', error);
+    res.status(500).json({ error: 'Failed to delete pending issue', details: error.message });
+  }
+});
+
+// PUT update existing issue
+app.put('/api/issues/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const updateFields = [];
+    const params = [];
+
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== undefined) {
+        updateFields.push(`${key} = ?`);
+        params.push(updates[key]);
+      }
+    });
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    params.push(id);
+    const query = `UPDATE issues SET ${updateFields.join(', ')} WHERE id = ?`;
+    
+    const [result] = await pool.execute(query, params);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Issue not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating issue:', error);
+    res.status(500).json({ error: 'Failed to update issue', details: error.message });
+  }
+});
+
+// POST rejected issue
+app.post('/api/rejected-issues', async (req, res) => {
+  try {
+    const {
+      original_title, original_description, category,
+      rejection_reason, rejected_by, original_pending_issue_id
+    } = req.body;
+
+    const rejectedId = 'rejected_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    
+    await pool.execute(
+      `INSERT INTO rejected_issues (
+        id, original_title, original_description, category,
+        rejection_reason, rejected_by, original_pending_issue_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        rejectedId, original_title, original_description, category,
+        rejection_reason, rejected_by, original_pending_issue_id
+      ]
+    );
+
+    res.json({ success: true, id: rejectedId });
+  } catch (error) {
+    console.error('Error creating rejected issue:', error);
+    res.status(500).json({ error: 'Failed to create rejected issue', details: error.message });
+  }
+});
+
+// PUT update pending issue
+app.put('/api/pending-issues/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    const updateFields = [];
+    const params = [];
+
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== undefined) {
+        updateFields.push(`${key} = ?`);
+        params.push(updates[key]);
+      }
+    });
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    params.push(id);
+    const query = `UPDATE pending_issues SET ${updateFields.join(', ')} WHERE id = ?`;
+    
+    const [result] = await pool.execute(query, params);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Pending issue not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating pending issue:', error);
+    res.status(500).json({ error: 'Failed to update pending issue', details: error.message });
+  }
+});
+
+// PUT update resolution
+app.put('/api/pending-resolutions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution_text } = req.body;
+    
+    const [result] = await pool.execute(
+      'UPDATE pending_resolutions SET resolution_text = ? WHERE id = ?',
+      [resolution_text, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Resolution not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating resolution:', error);
+    res.status(500).json({ error: 'Failed to update resolution', details: error.message });
+  }
+});
+
+// POST new resolution
+app.post('/api/pending-resolutions', async (req, res) => {
+  try {
+    const { pending_issue_id, resolution_text, confidence_score } = req.body;
+
+    const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    
+    await pool.execute(
+      `INSERT INTO pending_resolutions (
+        id, pending_issue_id, resolution_text, confidence_score, created_at
+      ) VALUES (?, ?, ?, ?, NOW())`,
+      [resolutionId, pending_issue_id, resolution_text, confidence_score]
+    );
+
+    res.json({ success: true, id: resolutionId });
+  } catch (error) {
+    console.error('Error creating resolution:', error);
+    res.status(500).json({ error: 'Failed to create resolution', details: error.message });
   }
 });
 

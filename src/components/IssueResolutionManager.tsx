@@ -8,9 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { CheckCircle, XCircle, Edit, Plus, Loader2, Lightbulb, AlertTriangle, Sparkles } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from "@/contexts/AuthContext";
 import { openaiService } from '@/services/openaiService';
+import { mysqlService } from '@/services/mysqlService';
 
 interface PendingIssueWithResolution {
   id: string;
@@ -58,25 +58,24 @@ const IssueResolutionManager = () => {
   const { data: pendingIssues = [], isLoading, error, refetch } = useQuery({
     queryKey: ['pending-issues'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('pending_issues')
-        .select(`
-          *,
-          pending_resolutions (
-            id,
-            resolution_text,
-            confidence_score
-          ),
-          feedback:detected_from_feedback_id (
-            customer_name,
-            review_text,
-            issue_location
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as PendingIssueWithResolution[];
+      try {
+        const response = await fetch(`${mysqlService.apiBaseUrl}/pending-issues`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch pending issues: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data as PendingIssueWithResolution[];
+      } catch (error) {
+        console.error('Error fetching pending issues:', error);
+        throw error;
+      }
     },
     enabled: isAuthenticated,
     retry: 1,
@@ -86,13 +85,24 @@ const IssueResolutionManager = () => {
   const { data: existingIssues = [] } = useQuery({
     queryKey: ['existing-issues'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('issues')
-        .select('id, title, category, description, feedback_count')
-        .eq('status', 'approved');
-
-      if (error) throw error;
-      return data as ExistingIssue[];
+      try {
+        const response = await fetch(`${mysqlService.apiBaseUrl}/issues?status=approved`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch existing issues: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data as ExistingIssue[];
+      } catch (error) {
+        console.error('Error fetching existing issues:', error);
+        throw error;
+      }
     },
     enabled: isAuthenticated,
     retry: 1,
@@ -140,28 +150,22 @@ const IssueResolutionManager = () => {
       
       // Store in database for future use
       try {
-        const { data: existingResolutions, error: fetchError } = await supabase
-          .from('pending_resolutions')
-          .select('id')
-          .eq('pending_issue_id', issue.id);
+        const response = await fetch(`${mysqlService.apiBaseUrl}/pending-resolutions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pending_issue_id: issue.id,
+            resolution_text: resolution.resolution_text,
+            confidence_score: resolution.confidence_score
+          }),
+        });
         
-        if (fetchError) {
-          console.error(`Error checking for existing resolutions: ${fetchError.message}`);
-        } else if (!existingResolutions || existingResolutions.length === 0) {
-          // Only insert if no resolution exists yet
-          const { error: insertError } = await supabase
-            .from('pending_resolutions')
-            .insert({
-              pending_issue_id: issue.id,
-              resolution_text: resolution.resolution_text,
-              confidence_score: resolution.confidence_score
-            });
-            
-          if (insertError) {
-            console.error(`Error storing resolution in database: ${insertError.message}`);
-          } else {
-            console.log(`Stored new resolution in database for issue ${issue.id}`);
-          }
+        if (!response.ok) {
+          console.error(`Error storing resolution in database: ${response.status}`);
+        } else {
+          console.log(`Stored new resolution in database for issue ${issue.id}`);
         }
       } catch (dbError) {
         console.error('Database operation failed:', dbError);
@@ -284,9 +288,12 @@ const IssueResolutionManager = () => {
       const resolution = getResolutionText(issue);
       
       // Create new approved issue
-      const { error: issueError } = await supabase
-        .from('issues')
-        .insert({
+      const response = await fetch(`${mysqlService.apiBaseUrl}/issues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           title: issue.title,
           description: issue.description,
           category: issue.category,
@@ -296,12 +303,17 @@ const IssueResolutionManager = () => {
           feedback_count: issue.feedback_count,
           approved_by: user?.name || 'System',
           approved_date: new Date().toISOString()
-        });
+        }),
+      });
 
-      if (issueError) throw issueError;
+      if (!response.ok) {
+        throw new Error(`Failed to create new issue: ${response.status}`);
+      }
 
       // Delete pending issue and its resolutions
-      await supabase.from('pending_issues').delete().eq('id', issue.id);
+      await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${issue.id}`, {
+        method: 'DELETE',
+      });
       
       refetch();
       toast({
@@ -330,18 +342,25 @@ const IssueResolutionManager = () => {
         
         // Update existing issue feedback count by incrementing it
         const newFeedbackCount = (existingIssue?.feedback_count || 0) + 1;
-        const { error: updateError } = await supabase
-          .from('issues')
-          .update({ 
+        const response = await fetch(`${mysqlService.apiBaseUrl}/issues/${selectedExistingIssue}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
             feedback_count: newFeedbackCount,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', selectedExistingIssue);
+          }),
+        });
 
-        if (updateError) throw updateError;
+        if (!response.ok) {
+          throw new Error(`Failed to update existing issue: ${response.status}`);
+        }
 
         // Delete pending issue
-        await supabase.from('pending_issues').delete().eq('id', currentIssue.id);
+        await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${currentIssue.id}`, {
+          method: 'DELETE',
+        });
         
         refetch();
         toast({
@@ -365,21 +384,29 @@ const IssueResolutionManager = () => {
   const handleReject = async (issueId: string, issue: PendingIssueWithResolution) => {
     try {
       // Move to rejected issues table
-      const { error: rejectError } = await supabase
-        .from('rejected_issues')
-        .insert({
+      const response = await fetch(`${mysqlService.apiBaseUrl}/rejected-issues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           original_title: issue.title,
           original_description: issue.description,
           category: issue.category,
           rejection_reason: 'Manually rejected by reviewer',
           rejected_by: user?.name || 'System',
           original_pending_issue_id: issueId
-        });
+        }),
+      });
 
-      if (rejectError) throw rejectError;
+      if (!response.ok) {
+        throw new Error(`Failed to create rejected issue: ${response.status}`);
+      }
 
       // Delete pending issue
-      await supabase.from('pending_issues').delete().eq('id', issueId);
+      await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${issueId}`, {
+        method: 'DELETE',
+      });
       
       refetch();
       toast({
@@ -409,12 +436,20 @@ const IssueResolutionManager = () => {
 
   const saveIssueEdit = async (issueId: string) => {
     try {
-      const { error } = await supabase
-        .from('pending_issues')
-        .update({ title: editedIssueText, updated_at: new Date().toISOString() })
-        .eq('id', issueId);
+      const response = await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${issueId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          title: editedIssueText, 
+          updated_at: new Date().toISOString() 
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`Failed to update issue: ${response.status}`);
+      }
 
       refetch();
       toast({
@@ -439,23 +474,34 @@ const IssueResolutionManager = () => {
       const resolutionId = issue?.pending_resolutions?.[0]?.id;
 
       if (resolutionId) {
-        const { error } = await supabase
-          .from('pending_resolutions')
-          .update({ resolution_text: editedResolutionText })
-          .eq('id', resolutionId);
+        const response = await fetch(`${mysqlService.apiBaseUrl}/pending-resolutions/${resolutionId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ resolution_text: editedResolutionText }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          throw new Error(`Failed to update resolution: ${response.status}`);
+        }
       } else {
         // Create new resolution if none exists
-        const { error } = await supabase
-          .from('pending_resolutions')
-          .insert({
+        const response = await fetch(`${mysqlService.apiBaseUrl}/pending-resolutions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             pending_issue_id: issueId,
             resolution_text: editedResolutionText,
             confidence_score: 0.8
-          });
+          }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          throw new Error(`Failed to create new resolution: ${response.status}`);
+        }
       }
 
       refetch();

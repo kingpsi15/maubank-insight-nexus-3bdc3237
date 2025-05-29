@@ -27,7 +27,7 @@ interface FeedbackRecord {
 
 class MySQLService {
   private config: MySQLConfig;
-  private apiBaseUrl: string;
+  public apiBaseUrl: string;
 
   constructor() {
     // Backend API server for MySQL connection
