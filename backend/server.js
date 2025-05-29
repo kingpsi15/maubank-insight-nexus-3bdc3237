@@ -19,6 +19,7 @@ app.use(cors({
   origin: [process.env.CORS_ORIGIN, 'http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://localhost:8081'],
   credentials: true
 }));
+
 app.use(express.json());
 
 // MySQL connection configuration
