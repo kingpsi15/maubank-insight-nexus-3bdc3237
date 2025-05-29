@@ -299,21 +299,27 @@ const IssueResolutionManager = () => {
           category: issue.category,
           resolution: resolution,
           status: 'approved',
-          confidence_score: issue.confidence_score,
-          feedback_count: issue.feedback_count,
+          confidence_score: issue.confidence_score || 0.8,
+          feedback_count: issue.feedback_count || 1,
           approved_by: user?.name || 'System',
           approved_date: new Date().toISOString()
         }),
       });
 
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error details:', errorData);
         throw new Error(`Failed to create new issue: ${response.status}`);
       }
 
       // Delete pending issue and its resolutions
-      await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${issue.id}`, {
+      const deleteResponse = await fetch(`${mysqlService.apiBaseUrl}/pending-issues/${issue.id}`, {
         method: 'DELETE',
       });
+
+      if (!deleteResponse.ok) {
+        console.error('Failed to delete pending issue:', await deleteResponse.json());
+      }
       
       refetch();
       toast({

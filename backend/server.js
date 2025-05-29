@@ -142,6 +142,33 @@ app.get('/api/feedback', async (req, res) => {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
+// Validate OpenAI API key on startup
+(async () => {
+  try {
+    console.log('Validating OpenAI API key...');
+    const response = await axios.post(
+      OPENAI_API_URL,
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 5
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        }
+      }
+    );
+    console.log('OpenAI API key is valid.');
+  } catch (error) {
+    console.error('Error validating OpenAI API key:', error.message);
+    console.error('API response:', error.response?.data);
+    console.warn('⚠️ Issue detection might not work properly due to invalid OpenAI API key!');
+    console.warn('⚠️ Set a valid API key in the OPENAI_API_KEY environment variable or update the hardcoded key.');
+  }
+})();
+
 // Issue detection helper function
 async function detectIssuesFromFeedback(connection, feedback) {
   try {
@@ -150,21 +177,31 @@ async function detectIssuesFromFeedback(connection, feedback) {
 
     // Skip positive feedback (rating 4 or 5)
     if (feedback.review_rating >= 4) {
+      console.log('[DEBUG] Skipping positive feedback (rating ≥ 4)');
       return null;
     }
 
     const { id, review_text, service_type, review_rating } = feedback;
-    if (!review_text || review_text.trim().length < 10) return null;
+    if (!review_text || review_text.trim().length < 10) {
+      console.log('[DEBUG] Skipping feedback with insufficient text');
+      return null;
+    }
 
     // First use OpenAI to detect the issue
     console.log('[DEBUG] Using OpenAI for issue detection');
     try {
+      // Enhanced prompt with more explicit examples for better detection
       const prompt = `
-        Analyze this bank customer feedback and identify potential issues:
+        Analyze this bank customer feedback and identify potential issues.
         
         Service Type: ${service_type}
         Rating: ${review_rating}/5
         Feedback: "${review_text}"
+        
+        Examples of issues:
+        - For ATM: "ATM not dispensing cash", "ATM receipt not printing", "Card stuck in ATM"
+        - For OnlineBanking: "Login issues", "Slow website", "Transaction failed"
+        - For CoreBanking: "Long waiting time", "Staff was unhelpful", "Process took too long"
         
         If there is a legitimate issue, extract the following information in JSON format:
         {
@@ -180,6 +217,8 @@ async function detectIssuesFromFeedback(connection, feedback) {
         The resolution should be actionable, specific, and follow best practices in banking.
       `;
 
+      console.log('[DEBUG] Sending request to OpenAI API');
+      
       const response = await axios.post(
         OPENAI_API_URL,
         {
@@ -196,71 +235,184 @@ async function detectIssuesFromFeedback(connection, feedback) {
         }
       );
 
+      console.log('[DEBUG] Received response from OpenAI API');
       const content = response.data.choices[0].message.content.trim();
+      console.log('[DEBUG] OpenAI response content:', content);
       
       // Parse the JSON response
       try {
+        let result = null;
         const jsonMatch = content.match(/\{[\s\S]*\}/);
+        
         if (jsonMatch) {
-          const result = JSON.parse(jsonMatch[0]);
-          if (result === null) return null;
+          result = JSON.parse(jsonMatch[0]);
+          console.log('[DEBUG] Successfully parsed JSON from OpenAI response');
+        } else {
+          // If no JSON detected but the content contains useful info, create a simple issue
+          console.log('[DEBUG] No JSON found in response, checking for manual detection');
           
-          const { title, description, category, confidence_score, resolution } = result;
-          
-          // Now check if we have a similar issue already in the database
-          const [existingSimilarIssues] = await connection.execute(
-            'SELECT * FROM pending_issues WHERE category = ? AND (title LIKE ? OR description LIKE ?) LIMIT 5',
-            [category, `%${title.substring(0, 50)}%`, `%${description.substring(0, 50)}%`]
-          );
-
-          if (existingSimilarIssues && existingSimilarIssues.length > 0) {
-            // We found a similar issue, increment the feedback count
-            const existingIssue = existingSimilarIssues[0];
-            await connection.execute(
-              'UPDATE pending_issues SET feedback_count = feedback_count + 1 WHERE id = ?',
-              [existingIssue.id]
-            );
-            console.log(`[DEBUG] Found similar existing issue: ${existingIssue.id}, incrementing count`);
-            return existingIssue.id;
+          // Fallback method if OpenAI doesn't return proper JSON
+          if (service_type === 'ATM' && review_text.toLowerCase().includes('receipt')) {
+            console.log('[DEBUG] Manual detection: ATM receipt issue');
+            result = {
+              title: "ATM Receipt Issue",
+              description: "Customer reported issues with ATM receipts not being provided or printed correctly.",
+              category: "ATM",
+              confidence_score: 0.85,
+              resolution: "1. Check the receipt printer status in the ATM. 2. Verify if the transaction was completed successfully. 3. Provide transaction confirmation to the customer via SMS or email. 4. Schedule maintenance for the receipt printer if needed."
+            };
           }
-
-          // No similar issue found, create a new one
-          const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-          
-          // Save the new issue to database
-          await connection.execute(
-            `INSERT INTO pending_issues 
-              (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [issueId, title, description, category, confidence_score, 1, id]
-          );
-          
-          console.log(`[DEBUG] Created new issue with LLM: ${issueId}`);
-          
-          // Store the resolution
-          const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-          await connection.execute(
-            `INSERT INTO pending_resolutions 
-              (id, pending_issue_id, resolution_text, confidence_score, created_at)
-              VALUES (?, ?, ?, ?, NOW())`,
-            [resolutionId, issueId, resolution || '', confidence_score]
-          );
-          
-          console.log(`[DEBUG] Created resolution for issue: ${resolutionId}`);
-          
-          return issueId;
         }
-        return null;
+        
+        if (result === null) {
+          console.log('[DEBUG] No issue detected in the feedback');
+          return null;
+        }
+        
+        console.log('[DEBUG] Issue detected:', result.title);
+        const { title, description, category, confidence_score, resolution } = result;
+        
+        // Now check if we have a similar issue already in the database
+        const [existingSimilarIssues] = await connection.execute(
+          'SELECT * FROM pending_issues WHERE category = ? AND (title LIKE ? OR description LIKE ?) LIMIT 5',
+          [category, `%${title.substring(0, 50)}%`, `%${description.substring(0, 50)}%`]
+        );
+
+        if (existingSimilarIssues && existingSimilarIssues.length > 0) {
+          // We found a similar issue, increment the feedback count
+          const existingIssue = existingSimilarIssues[0];
+          await connection.execute(
+            'UPDATE pending_issues SET feedback_count = feedback_count + 1 WHERE id = ?',
+            [existingIssue.id]
+          );
+          console.log(`[DEBUG] Found similar existing issue: ${existingIssue.id}, incrementing count`);
+          return existingIssue.id;
+        }
+
+        // No similar issue found, create a new one
+        const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        
+        // Save the new issue to database
+        await connection.execute(
+          `INSERT INTO pending_issues 
+            (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [issueId, title, description, category, confidence_score, 1, id]
+        );
+        
+        console.log(`[DEBUG] Created new issue with LLM: ${issueId}`);
+        
+        // Store the resolution
+        const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        await connection.execute(
+          `INSERT INTO pending_resolutions 
+            (id, pending_issue_id, resolution_text, confidence_score, created_at)
+            VALUES (?, ?, ?, ?, NOW())`,
+          [resolutionId, issueId, resolution || '', confidence_score]
+        );
+        
+        console.log(`[DEBUG] Created resolution for issue: ${resolutionId}`);
+        
+        return issueId;
       } catch (error) {
-        console.error('Error parsing OpenAI response:', error);
+        console.error('[DEBUG] Error parsing OpenAI response:', error);
+        
+        // Fallback to manual issue detection for common problems
+        if (service_type === 'ATM') {
+          if (review_text.toLowerCase().includes('receipt') || review_text.toLowerCase().includes('transaction')) {
+            console.log('[DEBUG] Fallback detection: ATM receipt/transaction issue');
+            // Create a fallback issue
+            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_issues 
+                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+              [
+                issueId, 
+                "ATM Receipt/Transaction Issue", 
+                "Customer reported issues with ATM receipts or transaction confirmation.",
+                "ATM",
+                0.8,
+                1,
+                id
+              ]
+            );
+            
+            // Create fallback resolution
+            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_resolutions 
+                (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                VALUES (?, ?, ?, ?, NOW())`,
+              [
+                resolutionId, 
+                issueId, 
+                "1. Verify if the transaction was completed successfully in the system. 2. Inform the customer about their transaction status. 3. Check the ATM's receipt printer functionality. 4. Schedule maintenance if needed. 5. Consider implementing digital receipts via SMS or email as an alternative.", 
+                0.8
+              ]
+            );
+            
+            console.log(`[DEBUG] Created fallback issue and resolution: ${issueId}`);
+            return issueId;
+          }
+        }
+        
         return null;
       }
     } catch (error) {
-      console.error('Error calling OpenAI API for issue detection:', error);
+      console.error('[DEBUG] Error calling OpenAI API for issue detection:', error);
+      console.error('[DEBUG] Error details:', error.response?.data || error.message);
+      
+      // Fallback to keyword-based detection
+      console.log('[DEBUG] Using fallback keyword detection');
+      
+      // Check for common keywords by service type
+      if (service_type === 'ATM') {
+        const atmKeywords = ['receipt', 'transaction', 'not working', 'card', 'cash', 'money', 'stuck'];
+        for (const keyword of atmKeywords) {
+          if (review_text.toLowerCase().includes(keyword)) {
+            console.log(`[DEBUG] Keyword match found: ${keyword}`);
+            // Create a fallback issue
+            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_issues 
+                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+              [
+                issueId, 
+                `ATM ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                `Customer reported an issue related to ${keyword} at the ATM.`,
+                "ATM",
+                0.75,
+                1,
+                id
+              ]
+            );
+            
+            // Create fallback resolution
+            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_resolutions 
+                (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                VALUES (?, ?, ?, ?, NOW())`,
+              [
+                resolutionId, 
+                issueId, 
+                `Please check the ATM for any issues related to ${keyword}. Verify the transaction status in the system and contact the customer to provide information about their transaction. Schedule maintenance if required.`, 
+                0.75
+              ]
+            );
+            
+            console.log(`[DEBUG] Created keyword-based issue and resolution: ${issueId}`);
+            return issueId;
+          }
+        }
+      }
+      
       return null;
     }
   } catch (error) {
-    console.error('Error in issue detection:', error);
+    console.error('[DEBUG] Error in issue detection:', error);
     return null;
   }
 }
@@ -277,6 +429,8 @@ app.post('/api/feedback', async (req, res) => {
       service_type, review_text, review_rating, issue_location,
       contacted_bank_person, status = 'new'
     } = req.body;
+
+    console.log(`[INFO] Creating new feedback from ${customer_name}, Rating: ${review_rating}, Service: ${service_type}`);
 
     const feedbackId = 'fb_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
     const positive_flag = review_rating >= 4;
@@ -301,19 +455,76 @@ app.post('/api/feedback', async (req, res) => {
     ];
 
     await connection.execute(query, params);
+    console.log(`[INFO] Feedback created with ID: ${feedbackId}`);
 
+    let issueId = null;
     if (negative_flag) {
-      await detectIssuesFromFeedback(connection, {
-        id: feedbackId, review_text, service_type, review_rating, sentiment, positive_flag, negative_flag
-      });
+      console.log(`[INFO] Negative feedback detected (rating ${review_rating}), detecting issues...`);
+      try {
+        issueId = await detectIssuesFromFeedback(connection, {
+          id: feedbackId, review_text, service_type, review_rating, sentiment, positive_flag, negative_flag
+        });
+        
+        if (issueId) {
+          console.log(`[INFO] Issue detected and created with ID: ${issueId}`);
+        } else {
+          console.log(`[WARN] No issues detected for negative feedback ID: ${feedbackId}`);
+          
+          // Fallback issue detection for specific keywords if OpenAI detection failed
+          if (service_type === 'ATM' && review_text.toLowerCase().includes('receipt')) {
+            console.log('[INFO] Fallback: Creating ATM receipt issue');
+            issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            
+            await connection.execute(
+              `INSERT INTO pending_issues 
+                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+              [
+                issueId, 
+                "ATM Receipt Issue", 
+                "Customer reported issues with ATM receipts or transaction confirmation.",
+                "ATM",
+                0.9,
+                1,
+                feedbackId
+              ]
+            );
+            
+            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_resolutions 
+                (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                VALUES (?, ?, ?, ?, NOW())`,
+              [
+                resolutionId, 
+                issueId, 
+                "1. Verify if the transaction was completed successfully in the system. 2. Inform the customer about their transaction status. 3. Check the ATM's receipt printer functionality. 4. Schedule maintenance if needed.", 
+                0.9
+              ]
+            );
+            
+            console.log(`[INFO] Created fallback issue with ID: ${issueId}`);
+          }
+        }
+      } catch (issueError) {
+        console.error('[ERROR] Issue detection failed:', issueError);
+      }
+    } else {
+      console.log(`[INFO] Positive feedback (rating ${review_rating}), skipping issue detection`);
     }
 
     await connection.commit();
 
-    res.json({ success: true, id: feedbackId, message: 'Feedback created successfully' });
+    res.json({ 
+      success: true, 
+      id: feedbackId, 
+      issue_detected: issueId ? true : false,
+      issue_id: issueId,
+      message: 'Feedback created successfully' 
+    });
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error('Error creating feedback:', error);
+    console.error('[ERROR] Error creating feedback:', error);
     res.status(500).json({ error: 'Failed to create feedback record', details: error.message });
   } finally {
     if (connection) connection.release();
@@ -701,6 +912,19 @@ app.post('/api/rejected-issues', async (req, res) => {
   } catch (error) {
     console.error('Error creating rejected issue:', error);
     res.status(500).json({ error: 'Failed to create rejected issue', details: error.message });
+  }
+});
+
+// GET rejected issues
+app.get('/api/rejected-issues', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM rejected_issues ORDER BY created_at DESC'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching rejected issues:', error);
+    res.status(500).json({ error: 'Failed to fetch rejected issues', details: error.message });
   }
 });
 

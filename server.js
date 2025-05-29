@@ -122,3 +122,44 @@ app.post('/api/import-csv', upload.single('csvFile'), async (req, res) => {
     });
   }
 }); 
+
+// GET rejected issues
+app.get('/api/rejected-issues', async (req, res) => {
+  try {
+    // Check if the rejected_issues table exists
+    const [tables] = await pool.execute(
+      "SHOW TABLES LIKE 'rejected_issues'"
+    );
+    
+    // If table doesn't exist, create it
+    if (tables.length === 0) {
+      console.log('Creating rejected_issues table as it does not exist');
+      await pool.execute(`
+        CREATE TABLE rejected_issues (
+          id VARCHAR(100) PRIMARY KEY,
+          original_title VARCHAR(255) NOT NULL,
+          original_description TEXT,
+          category VARCHAR(100),
+          rejection_reason TEXT,
+          rejected_by VARCHAR(100),
+          original_pending_issue_id VARCHAR(100),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      // Return empty array since table was just created
+      return res.json([]);
+    }
+    
+    // Table exists, so fetch the data
+    const [rows] = await pool.execute(
+      'SELECT * FROM rejected_issues ORDER BY created_at DESC'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching rejected issues:', error);
+    res.status(500).json({ error: 'Failed to fetch rejected issues', details: error.message });
+  }
+});
+
+// PUT update pending issue
+// ... existing code ... 

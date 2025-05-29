@@ -7,26 +7,37 @@ import { CheckCircle, XCircle, Clock, AlertTriangle, LogOut, User, Loader2 } fro
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { mysqlService } from '@/services/mysqlService';
 import LoginForm from './LoginForm';
 import IssueResolutionManager from './IssueResolutionManager';
 
 const IssueEndorsement = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch approved issues with resolution field
   const { data: approvedIssues = [], isLoading: loadingApproved, error: approvedError } = useQuery({
     queryKey: ['approved-issues'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('issues')
-        .select('id, title, description, category, resolution, status, approved_by, approved_date, feedback_count, confidence_score, created_at')
-        .eq('status', 'approved')
-        .order('approved_date', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      try {
+        const response = await fetch(`${mysqlService.apiBaseUrl}/issues?status=approved`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch approved issues: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching approved issues:', error);
+        throw error;
+      }
     },
     enabled: isAuthenticated,
     retry: 1,
@@ -36,28 +47,51 @@ const IssueEndorsement = () => {
   const { data: rejectedIssues = [], isLoading: loadingRejected, error: rejectedError } = useQuery({
     queryKey: ['rejected-issues'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('rejected_issues')
-        .select('*')
-        .order('rejected_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      try {
+        const response = await fetch(`${mysqlService.apiBaseUrl}/rejected-issues`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch rejected issues: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching rejected issues:', error);
+        throw error;
+      }
     },
     enabled: isAuthenticated,
     retry: 1,
   });
 
-  // Fetch pending issues count
-  const { data: pendingCount = 0, error: pendingError } = useQuery({
+  // Fetch pending issues to get the count
+  const { data: pendingIssues = [], isLoading: loadingPending, error: pendingError } = useQuery({
     queryKey: ['pending-issues-count'],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('pending_issues')
-        .select('*', { count: 'exact', head: true });
-
-      if (error) throw error;
-      return count || 0;
+      try {
+        const response = await fetch(`${mysqlService.apiBaseUrl}/pending-issues`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch pending issues: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching pending issues:', error);
+        throw error;
+      }
     },
     enabled: isAuthenticated,
     retry: 1,
@@ -69,6 +103,13 @@ const IssueEndorsement = () => {
       title: "Logged Out",
       description: "You have been successfully logged out.",
     });
+  };
+
+  const handleRetry = () => {
+    queryClient.invalidateQueries({ queryKey: ['pending-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['pending-issues-count'] });
+    queryClient.invalidateQueries({ queryKey: ['approved-issues'] });
+    queryClient.invalidateQueries({ queryKey: ['rejected-issues'] });
   };
 
   if (!isAuthenticated) {
@@ -93,11 +134,20 @@ const IssueEndorsement = () => {
       <div className="space-y-6">
         <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-              <span className="text-sm font-medium text-red-800">
-                Error loading data. Please check your connection and try again.
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <span className="text-sm font-medium text-red-800">
+                  Error loading data. Please check your connection and try again.
+                </span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetry}
+              >
+                Retry
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -136,7 +186,7 @@ const IssueEndorsement = () => {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="pending" className="flex items-center">
             <Clock className="w-4 h-4 mr-2" />
-            Pending Issues ({pendingCount})
+            Pending Issues ({pendingIssues.length})
           </TabsTrigger>
           <TabsTrigger value="approved" className="flex items-center">
             <CheckCircle className="w-4 h-4 mr-2" />
@@ -149,30 +199,11 @@ const IssueEndorsement = () => {
         </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
-          {pendingError ? (
-            <Card className="border-red-200 bg-red-50">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                    <span className="text-sm font-medium text-red-800">
-                      Error loading pending issues. Please check your connection and try again.
-                    </span>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      const queryClient = useQueryClient();
-                      queryClient.invalidateQueries({ queryKey: ['pending-issues'] });
-                      queryClient.invalidateQueries({ queryKey: ['pending-issues-count'] });
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {loadingPending ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span className="ml-2">Loading pending issues...</span>
+            </div>
           ) : (
             <IssueResolutionManager />
           )}
@@ -203,34 +234,24 @@ const IssueEndorsement = () => {
                       <div className="flex items-center space-x-2 mb-2">
                         <Badge variant="outline">{issue.category}</Badge>
                         <Badge className="bg-green-100 text-green-800">Approved</Badge>
-                        <Badge variant="secondary">
-                          {issue.feedback_count} feedback{issue.feedback_count !== 1 ? 's' : ''}
-                        </Badge>
+                        <Badge variant="secondary">{issue.feedback_count} feedback{issue.feedback_count !== 1 ? 's' : ''}</Badge>
                       </div>
-                      <CardTitle className="text-lg">{issue.title}</CardTitle>
+                      <CardTitle>{issue.title}</CardTitle>
                       <CardDescription>
-                        Approved by {issue.approved_by} on {new Date(issue.approved_date).toLocaleDateString()}
-                        {issue.confidence_score && (
-                          <> | Confidence: {Math.round(issue.confidence_score * 100)}%</>
-                        )}
+                        Approved by: {issue.approved_by} | Date: {new Date(issue.approved_date).toLocaleDateString()}
                       </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
-                
                 <CardContent>
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-semibold mb-2">Issue Description:</h4>
-                      <p className="text-sm bg-gray-50 p-3 rounded border-l-4 border-l-gray-400">
-                        {issue.description}
-                      </p>
+                      <p className="text-sm text-gray-600">{issue.description}</p>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2">Resolution:</h4>
-                      <p className="text-sm bg-green-50 p-3 rounded border-l-4 border-l-green-400">
-                        {issue.resolution || 'No resolution provided'}
-                      </p>
+                      <h4 className="font-semibold mb-2">Resolution Plan:</h4>
+                      <p className="text-sm text-gray-600 bg-green-50 p-3 rounded border-l-4 border-l-green-400">{issue.resolution}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -249,7 +270,7 @@ const IssueEndorsement = () => {
             <Card>
               <CardContent className="flex items-center justify-center py-8 text-gray-500">
                 <div className="text-center">
-                  <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <XCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
                   <p>No rejected issues</p>
                   <p className="text-sm">Rejected issues will appear here after review</p>
                 </div>
@@ -263,32 +284,25 @@ const IssueEndorsement = () => {
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
                         <Badge variant="outline">{issue.category}</Badge>
-                        <Badge variant="destructive">Rejected</Badge>
+                        <Badge className="bg-red-100 text-red-800">Rejected</Badge>
                       </div>
-                      <CardTitle className="text-lg">{issue.original_title}</CardTitle>
+                      <CardTitle>{issue.original_title}</CardTitle>
                       <CardDescription>
-                        Rejected by {issue.rejected_by} on {new Date(issue.rejected_at).toLocaleDateString()}
+                        Rejected by: {issue.rejected_by} | Date: {new Date(issue.created_at).toLocaleDateString()}
                       </CardDescription>
                     </div>
                   </div>
                 </CardHeader>
-                
                 <CardContent>
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-semibold mb-2">Original Description:</h4>
-                      <p className="text-sm bg-gray-50 p-3 rounded border-l-4 border-l-gray-400">
-                        {issue.original_description}
-                      </p>
+                      <p className="text-sm text-gray-600">{issue.original_description}</p>
                     </div>
-                    {issue.rejection_reason && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Rejection Reason:</h4>
-                        <p className="text-sm bg-red-50 p-3 rounded border-l-4 border-l-red-400">
-                          {issue.rejection_reason}
-                        </p>
-                      </div>
-                    )}
+                    <div>
+                      <h4 className="font-semibold mb-2">Rejection Reason:</h4>
+                      <p className="text-sm text-gray-600 bg-red-50 p-3 rounded border-l-4 border-l-red-400">{issue.rejection_reason}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
