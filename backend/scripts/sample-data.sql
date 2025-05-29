@@ -1,7 +1,5 @@
-
 -- Sample data for feedback table
 -- Run this if you want to add more sample data manually
-
 USE feedback_db;
 
 INSERT INTO feedback (id, customer_name, service_type, review_text, review_rating, sentiment, status, issue_location, positive_flag, negative_flag) VALUES
@@ -15,3 +13,6 @@ INSERT INTO feedback (id, customer_name, service_type, review_text, review_ratin
 ('fb_013', 'Kumar Samy', 'OnlineBanking', 'Internet banking is reliable but could use better security features.', 4, 'positive', 'in_progress', 'Penang', true, false),
 ('fb_014', 'Lisa Chong', 'CoreBanking', 'Very helpful staff assisted me with my investment portfolio.', 4, 'positive', 'resolved', 'Johor Bahru', true, false),
 ('fb_015', 'Hassan Ibrahim', 'ATM', 'Great location and always working properly. No issues so far.', 4, 'positive', 'resolved', 'Melaka', true, false);
+
+UPDATE feedback SET sentiment = 'negative' WHERE review_rating <= 3 AND review_rating > 0;
+UPDATE feedback SET sentiment = 'positive' WHERE review_rating >= 4;

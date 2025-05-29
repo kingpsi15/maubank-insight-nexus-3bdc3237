@@ -1,16 +1,16 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle, XCircle, Edit, Plus, Loader2, Lightbulb } from 'lucide-react';
+import { CheckCircle, XCircle, Edit, Plus, Loader2, Lightbulb, AlertTriangle, Sparkles } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from "@/contexts/AuthContext";
+import { openaiService } from '@/services/openaiService';
 
 interface PendingIssueWithResolution {
   id: string;
@@ -43,7 +43,7 @@ interface ExistingIssue {
 
 const IssueResolutionManager = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [editingIssue, setEditingIssue] = useState<string | null>(null);
   const [editingResolution, setEditingResolution] = useState<string | null>(null);
   const [editedIssueText, setEditedIssueText] = useState('');
@@ -51,9 +51,11 @@ const IssueResolutionManager = () => {
   const [selectedExistingIssue, setSelectedExistingIssue] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentIssue, setCurrentIssue] = useState<PendingIssueWithResolution | null>(null);
+  const [resolutionCache, setResolutionCache] = useState<Record<string, { text: string, confidence: number }>>({});
+  const [isGeneratingResolution, setIsGeneratingResolution] = useState<Record<string, boolean>>({});
 
   // Fetch pending issues from database
-  const { data: pendingIssues = [], isLoading, refetch } = useQuery({
+  const { data: pendingIssues = [], isLoading, error, refetch } = useQuery({
     queryKey: ['pending-issues'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -76,6 +78,8 @@ const IssueResolutionManager = () => {
       if (error) throw error;
       return data as PendingIssueWithResolution[];
     },
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
   // Fetch existing approved issues
@@ -90,9 +94,104 @@ const IssueResolutionManager = () => {
       if (error) throw error;
       return data as ExistingIssue[];
     },
+    enabled: isAuthenticated,
+    retry: 1,
   });
 
-  // Generate fallback recommendation based on category and title
+  // Generate AI-based recommendation
+  const generateResolution = async (issue: PendingIssueWithResolution): Promise<{ text: string, confidence: number }> => {
+    try {
+      setIsGeneratingResolution(prev => ({ ...prev, [issue.id]: true }));
+      
+      // First check if issue already has a resolution in the database
+      if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
+        console.log(`Using existing resolution from database for issue ${issue.id}`);
+        const storedResolution = issue.pending_resolutions[0];
+        setResolutionCache(prev => ({
+          ...prev,
+          [issue.id]: {
+            text: storedResolution.resolution_text,
+            confidence: storedResolution.confidence_score || 0.8
+          }
+        }));
+        return {
+          text: storedResolution.resolution_text,
+          confidence: storedResolution.confidence_score || 0.8
+        };
+      }
+      
+      // No stored resolution, generate a new one with OpenAI
+      console.log(`Generating new resolution with OpenAI for issue ${issue.id}`);
+      const resolution = await openaiService.generateResolution({
+        title: issue.title,
+        description: issue.description,
+        category: issue.category,
+        feedback_text: issue.feedback?.review_text
+      });
+      
+      // Cache the result
+      setResolutionCache(prev => ({
+        ...prev,
+        [issue.id]: {
+          text: resolution.resolution_text,
+          confidence: resolution.confidence_score
+        }
+      }));
+      
+      // Store in database for future use
+      try {
+        const { data: existingResolutions, error: fetchError } = await supabase
+          .from('pending_resolutions')
+          .select('id')
+          .eq('pending_issue_id', issue.id);
+        
+        if (fetchError) {
+          console.error(`Error checking for existing resolutions: ${fetchError.message}`);
+        } else if (!existingResolutions || existingResolutions.length === 0) {
+          // Only insert if no resolution exists yet
+          const { error: insertError } = await supabase
+            .from('pending_resolutions')
+            .insert({
+              pending_issue_id: issue.id,
+              resolution_text: resolution.resolution_text,
+              confidence_score: resolution.confidence_score
+            });
+            
+          if (insertError) {
+            console.error(`Error storing resolution in database: ${insertError.message}`);
+          } else {
+            console.log(`Stored new resolution in database for issue ${issue.id}`);
+          }
+        }
+      } catch (dbError) {
+        console.error('Database operation failed:', dbError);
+      }
+      
+      return {
+        text: resolution.resolution_text,
+        confidence: resolution.confidence_score
+      };
+    } catch (error) {
+      console.error('Error generating AI resolution:', error);
+      // Fall back to rule-based recommendation
+      const fallbackText = generateFallbackRecommendation(issue);
+      setResolutionCache(prev => ({
+        ...prev,
+        [issue.id]: {
+          text: fallbackText,
+          confidence: 0.7
+        }
+      }));
+      return {
+        text: fallbackText,
+        confidence: 0.7
+      };
+    } finally {
+      setIsGeneratingResolution(prev => ({ ...prev, [issue.id]: false }));
+    }
+  };
+
+  // Generate fallback recommendation based on category and title (kept as backup)
   const generateFallbackRecommendation = (issue: PendingIssueWithResolution): string => {
     const category = issue.category?.toLowerCase();
     const title = issue.title?.toLowerCase();
@@ -120,18 +219,64 @@ const IssueResolutionManager = () => {
     return "Please review this issue with the appropriate department. Ensure proper documentation and follow standard escalation procedures. Contact the customer to acknowledge their concern and provide updates on resolution progress.";
   };
 
+  // Pre-fetch resolutions for all issues on component mount or when issues change
+  useEffect(() => {
+    const fetchResolutionsForNewIssues = async () => {
+      if (!pendingIssues || pendingIssues.length === 0) return;
+      
+      for (const issue of pendingIssues) {
+        // Skip if issue already has a resolution or is already being generated
+        if (resolutionCache[issue.id] || isGeneratingResolution[issue.id]) continue;
+        
+        // Skip if issue already has a resolution in the database
+        if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
+          setResolutionCache(prev => ({
+            ...prev,
+            [issue.id]: {
+              text: issue.pending_resolutions[0].resolution_text,
+              confidence: issue.pending_resolutions[0].confidence_score || 0.8
+            }
+          }));
+          continue;
+        }
+        
+        // Otherwise generate a new resolution
+        generateResolution(issue);
+      }
+    };
+    
+    fetchResolutionsForNewIssues();
+  }, [pendingIssues]);
+
   const getResolutionText = (issue: PendingIssueWithResolution): string => {
+    // First check if there's a resolution in the database
     if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
       return issue.pending_resolutions[0].resolution_text;
     }
-    return generateFallbackRecommendation(issue);
+    
+    // Then check if there's a cached resolution
+    if (resolutionCache[issue.id]) {
+      return resolutionCache[issue.id].text;
+    }
+    
+    // Otherwise use fallback and trigger generation
+    if (!isGeneratingResolution[issue.id]) {
+      generateResolution(issue);
+    }
+    
+    return "Generating AI recommendation...";
   };
 
   const getResolutionConfidence = (issue: PendingIssueWithResolution): number => {
     if (issue.pending_resolutions && issue.pending_resolutions.length > 0) {
       return issue.pending_resolutions[0].confidence_score || 0.8;
     }
-    return 0.75; // Default confidence for generated recommendations
+    
+    if (resolutionCache[issue.id]) {
+      return resolutionCache[issue.id].confidence;
+    }
+    
+    return 0.7; // Default confidence for generated recommendations
   };
 
   const handleAcceptAsNew = async (issue: PendingIssueWithResolution) => {
@@ -446,12 +591,27 @@ const IssueResolutionManager = () => {
                   <h4 className="font-semibold">
                     {hasExistingResolution ? 'AI-Generated Resolution:' : 'Recommended Resolution:'}
                   </h4>
-                  <Badge 
-                    className={`${getConfidenceColor(resolutionConfidence)} ml-2`}
-                    variant="outline"
-                  >
-                    {Math.round(resolutionConfidence * 100)}% confidence
-                  </Badge>
+                  {isGeneratingResolution[issue.id] ? (
+                    <div className="flex items-center ml-2">
+                      <Loader2 className="w-4 h-4 animate-spin mr-1 text-blue-600" />
+                      <span className="text-xs text-blue-600">Generating AI recommendation...</span>
+                    </div>
+                  ) : (
+                    <>
+                      {resolutionCache[issue.id] && (
+                        <Badge className="ml-2 bg-violet-100 text-violet-800 flex items-center">
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          AI Generated
+                        </Badge>
+                      )}
+                      <Badge 
+                        className={`${getConfidenceColor(resolutionConfidence)} ml-2`}
+                        variant="outline"
+                      >
+                        {Math.round(resolutionConfidence * 100)}% confidence
+                      </Badge>
+                    </>
+                  )}
                 </div>
                 {editingResolution === issue.id ? (
                   <div className="space-y-2">
@@ -472,14 +632,22 @@ const IssueResolutionManager = () => {
                   </div>
                 ) : (
                   <div className="relative">
-                    <p className={`text-sm p-3 rounded border-l-4 ${hasExistingResolution ? 'bg-blue-50 border-l-blue-400' : 'bg-green-50 border-l-green-400'}`}>
-                      {resolutionText}
-                    </p>
+                    {isGeneratingResolution[issue.id] ? (
+                      <p className="text-sm p-3 rounded border-l-4 bg-blue-50 border-l-blue-400 min-h-[80px] flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        Generating AI recommendation...
+                      </p>
+                    ) : (
+                      <p className={`text-sm p-3 rounded border-l-4 ${resolutionCache[issue.id] ? 'bg-violet-50 border-l-violet-400' : hasExistingResolution ? 'bg-blue-50 border-l-blue-400' : 'bg-green-50 border-l-green-400'}`}>
+                        {resolutionText}
+                      </p>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute top-2 right-2"
                       onClick={() => startEditResolution(issue.id, resolutionText)}
+                      disabled={isGeneratingResolution[issue.id]}
                     >
                       <Edit className="w-4 h-4" />
                     </Button>

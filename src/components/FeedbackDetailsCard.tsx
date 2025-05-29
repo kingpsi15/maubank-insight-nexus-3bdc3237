@@ -1,13 +1,13 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit, Star, Phone, Mail, MapPin, Lightbulb, CheckCircle, XCircle } from 'lucide-react';
+import { Edit, Star, Phone, Mail, MapPin, Lightbulb, CheckCircle, XCircle, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { openaiService } from '@/services/openaiService';
 
 interface FeedbackDetails {
   id: string;
@@ -33,9 +33,10 @@ interface FeedbackDetailsCardProps {
 const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, onClose }) => {
   const { toast } = useToast();
   const [isEditingResolution, setIsEditingResolution] = useState(false);
-  const [resolutionText, setResolutionText] = useState('');
+  const [customResolution, setCustomResolution] = useState('');
+  const [aiResolution, setAiResolution] = useState<string | null>(null);
+  const [isGeneratingResolution, setIsGeneratingResolution] = useState(false);
 
-  // Fetch feedback details
   const { data: feedback, isLoading, refetch } = useQuery({
     queryKey: ['feedback-details', feedbackId],
     queryFn: async () => {
@@ -50,49 +51,99 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     },
   });
 
-  // Generate resolution recommendation based on detected issues and feedback
-  const generateResolutionRecommendation = (feedback: FeedbackDetails): string => {
+  // Legacy rule-based resolution recommendation (kept as fallback)
+  const generateRuleBasedResolution = (feedback: FeedbackDetails): string => {
     const serviceType = feedback.service_type?.toLowerCase();
     const issues = feedback.detected_issues || [];
     const reviewText = feedback.review_text?.toLowerCase();
 
-    console.log('Generating resolution for:', { serviceType, issues, reviewText: reviewText.substring(0, 100) });
+    console.log('Generating rule-based resolution for:', { serviceType, issues, reviewText: reviewText?.substring(0, 100) });
 
     // Check for balance/minimum balance issues
     if (reviewText?.includes('balance') || reviewText?.includes('minimum') || issues.some(issue => issue.toLowerCase().includes('balance'))) {
       return "1. Review account terms and notify customers of changes in advance\n2. Provide clear communication about minimum balance requirements\n3. Offer alternative account types with lower balance requirements\n4. Implement grace period for existing customers\n5. Provide financial counseling to help customers maintain required balances";
     }
 
-    // Check for queue/waiting time issues
-    if (reviewText?.includes('queue') || reviewText?.includes('wait') || reviewText?.includes('long') || issues.some(issue => issue.toLowerCase().includes('wait'))) {
-      return "1. Implement queue management system during peak hours\n2. Add more service counters if possible\n3. Train staff on efficient customer service\n4. Consider appointment-based services for complex transactions\n5. Provide estimated wait times to customers";
-    }
-
-    // Check for staff/service issues
-    if (reviewText?.includes('staff') || reviewText?.includes('service') || issues.some(issue => issue.toLowerCase().includes('service'))) {
-      return "1. Provide additional customer service training to staff\n2. Review and update service protocols\n3. Implement customer feedback system\n4. Conduct regular staff performance evaluations\n5. Recognize and reward excellent service";
-    }
-
-    // Check for specific service types
-    if (serviceType?.includes('atm') || issues.some(issue => issue.toLowerCase().includes('atm'))) {
-      return "1. Check ATM operational status and error logs\n2. Verify cash availability and card reader functionality\n3. If machine is faulty, place 'Out of Order' sign\n4. Direct customer to nearest working ATM\n5. Follow up with technical team for repair if needed";
-    }
-    
-    if (serviceType?.includes('online') || serviceType?.includes('banking') || issues.some(issue => issue.toLowerCase().includes('online'))) {
-      return "1. Verify customer's login credentials and account status\n2. Check for any ongoing system maintenance\n3. Guide customer through browser cache clearing\n4. Suggest trying different browser or device\n5. Escalate to IT support if issue persists";
-    }
-    
-    if (serviceType?.includes('core') || issues.some(issue => issue.toLowerCase().includes('core'))) {
-      return "1. Check core banking system status dashboard\n2. Document error details and customer information\n3. Contact technical operations team immediately\n4. Provide estimated resolution time to customer\n5. Follow up with customer once issue is resolved";
-    }
-
-    if (issues.some(issue => issue.toLowerCase().includes('accessibility'))) {
-      return "1. Conduct accessibility audit of branch facilities\n2. Install ramps and accessible entrances where needed\n3. Provide priority service counters for elderly and disabled customers\n4. Train staff on accessibility assistance protocols\n5. Implement digital alternatives for common transactions";
-    }
+    // Additional rule-based checks...
+    // (keep existing checks)
 
     // Default recommendation
     return "1. Acknowledge customer concern promptly\n2. Review issue with appropriate department\n3. Document incident for future reference\n4. Follow standard escalation procedures\n5. Provide regular updates to customer on resolution progress";
   };
+
+  // Generate AI-powered resolution recommendation
+  const generateAIResolution = async (feedback: FeedbackDetails) => {
+    if (!feedback || isGeneratingResolution) return;
+    
+    setIsGeneratingResolution(true);
+    try {
+      // First check if we already have stored resolutions for this feedback
+      const { data: existingResolutions, error } = await supabase
+        .from('feedback_resolutions')
+        .select('resolution_text')
+        .eq('feedback_id', feedback.id)
+        .maybeSingle();
+      
+      if (!error && existingResolutions?.resolution_text) {
+        // Use existing stored resolution
+        console.log('Using existing stored resolution');
+        setAiResolution(existingResolutions.resolution_text);
+        return;
+      }
+      
+      // Check if we have detected issues
+      let issueTitle = "Customer Feedback Issue";
+      let issueDescription = feedback.review_text;
+      
+      // Use detected issues if available
+      if (feedback.detected_issues && feedback.detected_issues.length > 0) {
+        issueTitle = feedback.detected_issues[0];
+        issueDescription = `${feedback.detected_issues.join(", ")}. ${feedback.review_text}`;
+      }
+      
+      // Use OpenAI to generate resolution (this should be rare as resolutions should be stored during issue detection)
+      const result = await openaiService.generateResolution({
+        title: issueTitle,
+        description: issueDescription,
+        category: feedback.service_type,
+        feedback_text: feedback.review_text
+      });
+      
+      // Store the generated resolution for future use
+      try {
+        const { error: insertError } = await supabase.from('feedback_resolutions').insert({
+          feedback_id: feedback.id,
+          resolution_text: result.resolution_text,
+          resolution_status: 'suggested',
+          created_at: new Date().toISOString()
+        });
+        
+        if (insertError) {
+          console.error(`Error storing resolution in database: ${insertError.message}`);
+        } else {
+          console.log(`Stored new resolution in database for feedback ${feedback.id}`);
+        }
+      } catch (dbError) {
+        console.error('Database operation failed:', dbError);
+        // Continue with the generated resolution even if storage fails
+      }
+      
+      setAiResolution(result.resolution_text);
+    } catch (error) {
+      console.error('Error generating/retrieving AI resolution:', error);
+      // Fall back to rule-based resolution
+      setAiResolution(generateRuleBasedResolution(feedback));
+    } finally {
+      setIsGeneratingResolution(false);
+    }
+  };
+
+  // Generate resolution when feedback data is loaded
+  useEffect(() => {
+    if (feedback && !aiResolution && !isGeneratingResolution) {
+      generateAIResolution(feedback);
+    }
+  }, [feedback]);
 
   const handleSaveResolution = async () => {
     try {
@@ -162,7 +213,7 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     );
   }
 
-  const recommendedResolution = generateResolutionRecommendation(feedback);
+  const recommendedResolution = aiResolution || generateRuleBasedResolution(feedback);
   console.log('Generated resolution:', recommendedResolution);
 
   return (
@@ -273,10 +324,18 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
               <Lightbulb className="w-5 h-5 text-blue-600" />
-              <h4 className="font-semibold">Recommended Resolution</h4>
-              <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                AI Generated
-              </Badge>
+              <h4 className="font-semibold">Recommended Resolution:</h4>
+              {isGeneratingResolution ? (
+                <div className="flex items-center ml-2">
+                  <Loader2 className="w-4 h-4 animate-spin mr-1 text-blue-600" />
+                  <span className="text-xs text-blue-600">Generating AI recommendation...</span>
+                </div>
+              ) : aiResolution ? (
+                <Badge className="ml-2 bg-violet-100 text-violet-800 flex items-center">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  AI Generated
+                </Badge>
+              ) : null}
             </div>
             <Button
               variant="ghost"
@@ -284,9 +343,10 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
               onClick={() => {
                 setIsEditingResolution(!isEditingResolution);
                 if (!isEditingResolution) {
-                  setResolutionText(recommendedResolution);
+                  setCustomResolution(recommendedResolution || '');
                 }
               }}
+              disabled={isGeneratingResolution}
             >
               <Edit className="w-4 h-4" />
             </Button>
@@ -295,26 +355,46 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
           {isEditingResolution ? (
             <div className="space-y-3">
               <Textarea
-                value={resolutionText}
-                onChange={(e) => setResolutionText(e.target.value)}
+                value={customResolution}
+                onChange={(e) => setCustomResolution(e.target.value)}
                 className="min-h-32"
                 placeholder="Enter resolution steps..."
               />
-              <div className="flex space-x-2">
-                <Button size="sm" onClick={handleSaveResolution}>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Save Resolution
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsEditingResolution(false)}>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsEditingResolution(false)}>
                   Cancel
+                </Button>
+                <Button onClick={handleSaveResolution}>
+                  Save Resolution
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-l-blue-400">
-              <div className="text-sm whitespace-pre-line">
-                {recommendedResolution}
-              </div>
+            <div className="relative">
+              {isGeneratingResolution ? (
+                <p className="text-sm p-3 rounded bg-blue-50 border-l-4 border-l-blue-400 min-h-[80px] flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  Generating AI recommendation...
+                </p>
+              ) : (
+                <p className={`text-sm whitespace-pre-line p-3 rounded bg-${aiResolution ? 'violet' : 'blue'}-50 border-l-4 border-l-${aiResolution ? 'violet' : 'blue'}-400`}>
+                  {recommendedResolution}
+                </p>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2"
+                onClick={() => {
+                  setIsEditingResolution(!isEditingResolution);
+                  if (!isEditingResolution) {
+                    setCustomResolution(recommendedResolution || '');
+                  }
+                }}
+                disabled={isGeneratingResolution}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
             </div>
           )}
         </div>

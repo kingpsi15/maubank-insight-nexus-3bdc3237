@@ -218,7 +218,7 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter, dateFromFilter
                   <Badge variant="outline">{feedbackItem.service_type}</Badge>
                 </TableCell>
                 <TableCell>{getRatingStars(feedbackItem.review_rating)}</TableCell>
-                <TableCell>{getSentimentBadge(feedbackItem.sentiment)}</TableCell>
+                <TableCell>{getSentimentBadge(feedbackItem.review_rating >= 4 ? 'Positive' : 'Negative')}</TableCell>
                 <TableCell>
                   <Select value={feedbackItem.status} onValueChange={(value) => updateStatus(feedbackItem.id, value)}>
                     <SelectTrigger className="w-32">
@@ -291,7 +291,7 @@ const FeedbackTable = ({ searchTerm, statusFilter, serviceFilter, dateFromFilter
                             <div className="grid grid-cols-3 gap-4">
                               <div>
                                 <h4 className="font-semibold mb-2">Sentiment</h4>
-                                {getSentimentBadge(selectedFeedback.sentiment)}
+                                {getSentimentBadge(selectedFeedback.review_rating >= 4 ? 'Positive' : 'Negative')}
                               </div>
                               <div>
                                 <h4 className="font-semibold mb-2">Status</h4>

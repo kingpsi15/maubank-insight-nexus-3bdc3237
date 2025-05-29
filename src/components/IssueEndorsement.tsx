@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, XCircle, Clock, AlertTriangle, LogOut, User, Loader2 } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import LoginForm from './LoginForm';
 import IssueResolutionManager from './IssueResolutionManager';
@@ -150,7 +149,33 @@ const IssueEndorsement = () => {
         </TabsList>
 
         <TabsContent value="pending" className="space-y-4">
-          <IssueResolutionManager />
+          {pendingError ? (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <span className="text-sm font-medium text-red-800">
+                      Error loading pending issues. Please check your connection and try again.
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      const queryClient = useQueryClient();
+                      queryClient.invalidateQueries({ queryKey: ['pending-issues'] });
+                      queryClient.invalidateQueries({ queryKey: ['pending-issues-count'] });
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <IssueResolutionManager />
+          )}
         </TabsContent>
 
         <TabsContent value="approved" className="space-y-4">

@@ -41,7 +41,7 @@ const FeedbackManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
     if (!formData.customerName || !formData.reviewText || !formData.reviewRating || !formData.serviceType) {
       toast({
@@ -53,7 +53,6 @@ const FeedbackManagement = () => {
     }
 
     try {
-      // Create feedback object matching database schema
       const feedbackData = {
         customer_id: formData.customerId || null,
         customer_name: formData.customerName,
@@ -65,13 +64,12 @@ const FeedbackManagement = () => {
         issue_location: formData.issueLocation || null,
         contacted_bank_person: formData.contactedBankPerson || null,
         status: 'new' as const,
-        sentiment: 'neutral' as const,
+        sentiment: 'neutral' as const,  // You can change this logic if needed
         detected_issues: []
       };
 
       await createFeedback(feedbackData);
 
-      // Reset form
       setFormData({
         customerId: '',
         customerName: '',
@@ -86,6 +84,11 @@ const FeedbackManagement = () => {
       setShowAddForm(false);
     } catch (error) {
       console.error('Error creating feedback:', error);
+      toast({
+        title: "Submission Failed",
+        description: "Unable to save feedback. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -139,7 +142,7 @@ const FeedbackManagement = () => {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
@@ -236,7 +239,7 @@ const FeedbackManagement = () => {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="customerPhone">Phone Number</Label>
                   <Input
@@ -272,13 +275,12 @@ const FeedbackManagement = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="reviewRating">Rating (0-5) *</Label>
+                  <Label htmlFor="reviewRating">Rating (1-5) *</Label>
                   <Select value={formData.reviewRating} onValueChange={(value) => handleInputChange('reviewRating', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select rating" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">0 - No Rating</SelectItem>
                       <SelectItem value="1">1 - Very Poor</SelectItem>
                       <SelectItem value="2">2 - Poor</SelectItem>
                       <SelectItem value="3">3 - Average</SelectItem>
