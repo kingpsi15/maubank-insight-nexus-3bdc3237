@@ -16,7 +16,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // Middleware
 app.use(cors({
-  origin: [process.env.CORS_ORIGIN, 'http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://localhost:8081'],
+  origin: [process.env.CORS_ORIGIN, 'http://localhost:5173', 'http://localhost:3001', 'http://localhost:8082', 'http://localhost:8081'],
   credentials: true
 }));
 app.use(express.json());
@@ -52,6 +52,27 @@ console.log('Database configuration:', {
     console.log('Successfully connected to MySQL database');
     const [rows] = await connection.execute('SELECT COUNT(*) as count FROM feedback');
     console.log(`Feedback table has ${rows[0].count} records`);
+    
+    // Check if rejected_issues table exists, create if it doesn't
+    try {
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS rejected_issues (
+          id VARCHAR(255) PRIMARY KEY,
+          original_title VARCHAR(255) NOT NULL,
+          original_description TEXT,
+          category VARCHAR(50),
+          rejection_reason TEXT,
+          rejected_by VARCHAR(100),
+          original_pending_issue_id VARCHAR(255),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX (created_at)
+        )
+      `);
+      console.log('Checked/created rejected_issues table');
+    } catch (tableError) {
+      console.error('Error creating rejected_issues table:', tableError);
+    }
+    
     connection.release();
   } catch (error) {
     console.error('Error connecting to database on startup:', error);
@@ -139,7 +160,7 @@ app.get('/api/feedback', async (req, res) => {
 });
 
 // Add OpenAI API configuration
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 // Validate OpenAI API key on startup
@@ -918,13 +939,58 @@ app.post('/api/rejected-issues', async (req, res) => {
 // GET rejected issues
 app.get('/api/rejected-issues', async (req, res) => {
   try {
+    // Check if the table exists first
+    try {
+      const [tables] = await pool.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name = 'rejected_issues'",
+        [dbConfig.database]
+      );
+      
+      // If table doesn't exist, create it
+      if (tables.length === 0) {
+        console.log('rejected_issues table does not exist, creating it now');
+        await pool.execute(`
+          CREATE TABLE IF NOT EXISTS rejected_issues (
+            id VARCHAR(255) PRIMARY KEY,
+            original_title VARCHAR(255) NOT NULL,
+            original_description TEXT,
+            category VARCHAR(50),
+            rejection_reason TEXT,
+            rejected_by VARCHAR(100),
+            original_pending_issue_id VARCHAR(255),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (created_at)
+          )
+        `);
+        // Return empty array since table was just created
+        return res.json([]);
+      }
+    } catch (tableCheckError) {
+      console.error('Error checking/creating rejected_issues table:', tableCheckError);
+      // Continue to try the query anyway
+    }
+
     const [rows] = await pool.execute(
       'SELECT * FROM rejected_issues ORDER BY created_at DESC'
     );
     res.json(rows);
   } catch (error) {
     console.error('Error fetching rejected issues:', error);
-    res.status(500).json({ error: 'Failed to fetch rejected issues', details: error.message });
+    
+    // Provide more detailed error info for troubleshooting
+    const errorDetails = {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    };
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch rejected issues', 
+      details: errorDetails,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -1004,6 +1070,88 @@ app.post('/api/pending-resolutions', async (req, res) => {
   } catch (error) {
     console.error('Error creating resolution:', error);
     res.status(500).json({ error: 'Failed to create resolution', details: error.message });
+  }
+});
+
+// GET a single feedback record by ID
+app.get('/api/feedback/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [rows] = await pool.execute(
+      'SELECT * FROM feedback WHERE id = ?',
+      [id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching feedback by ID:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch feedback', 
+      details: error.message 
+    });
+  }
+});
+
+// GET pending issues for a specific feedback ID
+app.get('/api/pending-issues', async (req, res) => {
+  try {
+    let query = 'SELECT * FROM pending_issues';
+    const params = [];
+    
+    // Check if filtering by feedback ID
+    if (req.query.feedback_id) {
+      query = 'SELECT * FROM pending_issues WHERE detected_from_feedback_id = ?';
+      params.push(req.query.feedback_id);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const [rows] = await pool.execute(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching pending issues:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch pending issues', 
+      details: error.message 
+    });
+  }
+});
+
+// GET resolutions for a specific feedback ID
+app.get('/api/pending-resolutions', async (req, res) => {
+  try {
+    let query = 'SELECT * FROM pending_resolutions';
+    const params = [];
+    
+    // Check if filtering by feedback ID
+    if (req.query.feedback_id) {
+      query = `
+        SELECT pr.*
+        FROM pending_resolutions pr
+        JOIN pending_issues pi ON pr.pending_issue_id = pi.id
+        WHERE pi.detected_from_feedback_id = ?
+      `;
+      params.push(req.query.feedback_id);
+    } else if (req.query.pending_issue_id) {
+      query = 'SELECT * FROM pending_resolutions WHERE pending_issue_id = ?';
+      params.push(req.query.pending_issue_id);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const [rows] = await pool.execute(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching resolutions:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch resolutions', 
+      details: error.message 
+    });
   }
 });
 

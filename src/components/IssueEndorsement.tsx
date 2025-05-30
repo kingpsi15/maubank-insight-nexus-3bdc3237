@@ -56,6 +56,14 @@ const IssueEndorsement = () => {
         });
         
         if (!response.ok) {
+          // Instead of throwing an error, log it and return empty array if 500 error
+          console.error('Error fetching rejected issues:', `Failed to fetch rejected issues: ${response.status}`);
+          
+          // If it's a 500 error, likely server issue, return empty array to avoid breaking the UI
+          if (response.status === 500) {
+            return [];
+          }
+          
           throw new Error(`Failed to fetch rejected issues: ${response.status}`);
         }
         
@@ -63,7 +71,8 @@ const IssueEndorsement = () => {
         return data || [];
       } catch (error) {
         console.error('Error fetching rejected issues:', error);
-        throw error;
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
       }
     },
     enabled: isAuthenticated,

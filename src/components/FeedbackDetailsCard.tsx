@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Edit, Star, Phone, Mail, MapPin, Lightbulb, CheckCircle, XCircle, Loader2, Sparkles } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { mysqlService } from '@/services/mysqlService';
 import { openaiService } from '@/services/openaiService';
 
 interface FeedbackDetails {
@@ -21,8 +21,9 @@ interface FeedbackDetails {
   contacted_bank_person?: string;
   sentiment: string;
   status: string;
-  detected_issues: string[];
+  detected_issues?: string[];
   created_at: string;
+  resolution?: string;
 }
 
 interface FeedbackDetailsCardProps {
@@ -40,13 +41,9 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
   const { data: feedback, isLoading, refetch } = useQuery({
     queryKey: ['feedback-details', feedbackId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('feedback')
-        .select('*')
-        .eq('id', feedbackId)
-        .single();
-
-      if (error) throw error;
+      console.log('Fetching feedback details for ID:', feedbackId);
+      const data = await mysqlService.getFeedbackDetails(feedbackId);
+      if (!data) throw new Error('Feedback not found');
       return data as FeedbackDetails;
     },
   });
@@ -77,17 +74,10 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     
     setIsGeneratingResolution(true);
     try {
-      // First check if we already have stored resolutions for this feedback
-      const { data: existingResolutions, error } = await supabase
-        .from('feedback_resolutions')
-        .select('resolution_text')
-        .eq('feedback_id', feedback.id)
-        .maybeSingle();
-      
-      if (!error && existingResolutions?.resolution_text) {
-        // Use existing stored resolution
-        console.log('Using existing stored resolution');
-        setAiResolution(existingResolutions.resolution_text);
+      // If we already have a resolution from the database, use it
+      if (feedback.resolution) {
+        console.log('Using existing resolution from database');
+        setAiResolution(feedback.resolution);
         return;
       }
       
@@ -101,34 +91,24 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
         issueDescription = `${feedback.detected_issues.join(", ")}. ${feedback.review_text}`;
       }
       
-      // Use OpenAI to generate resolution (this should be rare as resolutions should be stored during issue detection)
-      const result = await openaiService.generateResolution({
-        title: issueTitle,
-        description: issueDescription,
-        category: feedback.service_type,
-        feedback_text: feedback.review_text
-      });
-      
-      // Store the generated resolution for future use
+      // Use OpenAI to generate resolution (this should be rare if issues are properly detected)
       try {
-        const { error: insertError } = await supabase.from('feedback_resolutions').insert({
-          feedback_id: feedback.id,
-          resolution_text: result.resolution_text,
-          resolution_status: 'suggested',
-          created_at: new Date().toISOString()
+        const result = await openaiService.generateResolution({
+          title: issueTitle,
+          description: issueDescription,
+          category: feedback.service_type,
+          feedback_text: feedback.review_text
         });
         
-        if (insertError) {
-          console.error(`Error storing resolution in database: ${insertError.message}`);
-        } else {
-          console.log(`Stored new resolution in database for feedback ${feedback.id}`);
-        }
-      } catch (dbError) {
-        console.error('Database operation failed:', dbError);
-        // Continue with the generated resolution even if storage fails
+        setAiResolution(result.resolution_text);
+        
+        // Save the resolution to database (implement this in mysql service if needed)
+        console.log('Generated new AI resolution', result.resolution_text);
+      } catch (aiError) {
+        console.error('Error generating resolution with AI:', aiError);
+        // Fall back to rule-based resolution
+        setAiResolution(generateRuleBasedResolution(feedback));
       }
-      
-      setAiResolution(result.resolution_text);
     } catch (error) {
       console.error('Error generating/retrieving AI resolution:', error);
       // Fall back to rule-based resolution
@@ -147,16 +127,12 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
 
   const handleSaveResolution = async () => {
     try {
-      // Save resolution to a resolutions table or update feedback
-      const { error } = await supabase
-        .from('feedback')
-        .update({ 
-          status: 'in_progress',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', feedbackId);
+      // Save resolution to MySQL database
+      const success = await mysqlService.updateFeedback(feedbackId, { 
+        status: 'in_progress',
+      });
 
-      if (error) throw error;
+      if (!success) throw new Error('Failed to update feedback');
 
       refetch();
       toast({
@@ -213,7 +189,7 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
     );
   }
 
-  const recommendedResolution = aiResolution || generateRuleBasedResolution(feedback);
+  const recommendedResolution = aiResolution || feedback.resolution || generateRuleBasedResolution(feedback);
   console.log('Generated resolution:', recommendedResolution);
 
   return (
@@ -267,10 +243,10 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
             </div>
           )}
           <Badge variant="outline">{feedback.service_type}</Badge>
-          <Badge className={`${feedback.sentiment === 'positive' ? 'bg-green-100 text-green-800' : feedback.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+          <Badge className={getSentimentColor(feedback.sentiment)}>
             {feedback.sentiment}
           </Badge>
-          <Badge className={`${feedback.status === 'new' ? 'bg-blue-100 text-blue-800' : feedback.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : feedback.status === 'resolved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <Badge className={getStatusColor(feedback.status)}>
             {feedback.status}
           </Badge>
         </div>
@@ -319,7 +295,7 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
           </div>
         )}
 
-        {/* Resolution Recommendation - This is the missing section */}
+        {/* Resolution Recommendation */}
         <div className="border-t pt-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
@@ -334,6 +310,11 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
                 <Badge className="ml-2 bg-violet-100 text-violet-800 flex items-center">
                   <Sparkles className="w-3 h-3 mr-1" />
                   AI Generated
+                </Badge>
+              ) : feedback.resolution ? (
+                <Badge className="ml-2 bg-green-100 text-green-800 flex items-center">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  From Database
                 </Badge>
               ) : null}
             </div>
@@ -377,24 +358,14 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
                   Generating AI recommendation...
                 </p>
               ) : (
-                <p className={`text-sm whitespace-pre-line p-3 rounded bg-${aiResolution ? 'violet' : 'blue'}-50 border-l-4 border-l-${aiResolution ? 'violet' : 'blue'}-400`}>
+                <p className={`text-sm whitespace-pre-line p-3 rounded bg-${
+                  feedback.resolution ? 'green' : aiResolution ? 'violet' : 'blue'
+                }-50 border-l-4 border-l-${
+                  feedback.resolution ? 'green' : aiResolution ? 'violet' : 'blue'
+                }-400`}>
                   {recommendedResolution}
                 </p>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => {
-                  setIsEditingResolution(!isEditingResolution);
-                  if (!isEditingResolution) {
-                    setCustomResolution(recommendedResolution || '');
-                  }
-                }}
-                disabled={isGeneratingResolution}
-              >
-                <Edit className="w-4 h-4" />
-              </Button>
             </div>
           )}
         </div>

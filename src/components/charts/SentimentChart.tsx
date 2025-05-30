@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const SentimentChart = () => {
   const data = [
-    { name: 'Positive', value: 854, color: '#10B981' },
-    { name: 'Negative', value: 146, color: '#EF4444' }
+    { name: 'Positive', value: 854, color: 'hsl(180, 50%, 45%)' },
+    { name: 'Negative', value: 146, color: 'hsl(0, 70%, 60%)' }
   ];
 
   const RADIAN = Math.PI / 180;
@@ -49,6 +48,7 @@ const SentimentChart = () => {
           </Pie>
           <Tooltip 
             formatter={(value: any) => [value, 'Feedback Count']}
+            contentStyle={{ backgroundColor: 'hsl(210, 30%, 97%)', borderColor: 'hsl(214, 20%, 91%)' }}
           />
           <Legend />
         </PieChart>

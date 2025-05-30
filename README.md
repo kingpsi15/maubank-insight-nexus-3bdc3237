@@ -36,3 +36,5 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+netstat -ano | findstr :3001
+TASKKILL /PID 2788 /F

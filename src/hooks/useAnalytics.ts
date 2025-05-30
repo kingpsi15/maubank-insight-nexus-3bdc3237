@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { mysqlService } from '@/services/mysqlService';
 
@@ -42,7 +41,7 @@ export const useAnalytics = (filters: any = {}) => {
 
   const { data: issuesData, isLoading: issuesLoading } = useQuery({
     queryKey: ['mysql-analytics', 'issues', filters],
-    queryFn: () => Promise.resolve([]), // MySQL service doesn't have issues data yet
+    queryFn: () => mysqlService.getIssuesData(filters),
     ...queryOptions,
   });
 

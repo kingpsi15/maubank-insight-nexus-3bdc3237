@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { useAnalytics } from '@/hooks/useAnalytics';
@@ -9,6 +8,13 @@ interface MySqlSentimentChartProps {
 
 const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} }) => {
   const { sentimentData, isLoading } = useAnalytics(filters);
+
+  // Define a default color palette that matches our new theme
+  const colorPalette = {
+    'Positive': 'hsl(180, 50%, 45%)',  // Primary teal
+    'Negative': 'hsl(0, 70%, 60%)',     // Soft red
+    'Neutral': 'hsl(210, 20%, 70%)'     // Muted gray-blue
+  };
 
   if (isLoading) {
     return (
@@ -28,6 +34,12 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
 
   // Filter out neutral sentiment as requested
   const filteredData = sentimentData.filter(item => item.name !== 'Neutral');
+  
+  // Ensure all data points have colors from our palette
+  const dataWithColors = filteredData.map(item => ({
+    ...item,
+    fill: colorPalette[item.name as keyof typeof colorPalette] || item.fill || 'hsl(210, 20%, 70%)'
+  }));
 
   const RADIAN = Math.PI / 180;
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
@@ -55,7 +67,7 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={filteredData}
+            data={dataWithColors}
             cx="50%"
             cy="50%"
             labelLine={false}
@@ -64,12 +76,13 @@ const MySqlSentimentChart: React.FC<MySqlSentimentChartProps> = ({ filters = {} 
             fill="#8884d8"
             dataKey="value"
           >
-            {filteredData.map((entry, index) => (
+            {dataWithColors.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.fill} />
             ))}
           </Pie>
           <Tooltip 
             formatter={(value: any) => [value, 'Feedback Count']}
+            contentStyle={{ backgroundColor: 'hsl(210, 30%, 97%)', borderColor: 'hsl(214, 20%, 91%)' }}
           />
           <Legend />
         </PieChart>

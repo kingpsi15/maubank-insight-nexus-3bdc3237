@@ -364,8 +364,133 @@ class MySQLService {
     }
   }
 
+  async getIssuesData(filters: any = {}) {
+    try {
+      const feedback = await this.getFeedback(filters);
+      
+      // Extract common issues from feedback data
+      // For demonstration, we'll extract issues based on common keywords in review_text
+      const issueKeywords = {
+        'ATM Withdrawal Issues': ['atm', 'withdraw', 'withdrawal', 'cash', 'dispense'],
+        'Card Declined': ['declined', 'decline', 'card rejected', 'not working'],
+        'Online Login Problems': ['login', 'password', 'cannot access', 'access denied'],
+        'Mobile App Crashes': ['crash', 'app freeze', 'not loading', 'mobile app'],
+        'Transaction Delays': ['delay', 'slow', 'transaction pending', 'not processed'],
+        'Fund Transfer Failures': ['transfer failed', 'transfer error', 'not transferred'],
+        'Account Balance Discrepancy': ['wrong balance', 'incorrect balance', 'missing deposit'],
+        'Fee Complaints': ['fee', 'charge', 'overcharged', 'unexpected fee']
+      };
+      
+      // Count occurrences of each issue
+      const issueCounts: Record<string, { count: number, category: string, description: string }> = {};
+      
+      feedback.forEach(item => {
+        const text = item.review_text.toLowerCase();
+        
+        Object.entries(issueKeywords).forEach(([issue, keywords]) => {
+          if (keywords.some(keyword => text.includes(keyword.toLowerCase()))) {
+            if (!issueCounts[issue]) {
+              issueCounts[issue] = { 
+                count: 0, 
+                category: item.service_type,
+                description: 'Common issue identified from customer feedback'
+              };
+            }
+            issueCounts[issue].count++;
+          }
+        });
+      });
+      
+      // Convert to array and sort by count
+      const result = Object.entries(issueCounts).map(([issue, data]) => ({
+        issue,
+        count: data.count,
+        category: data.category,
+        description: data.description
+      })).sort((a, b) => b.count - a.count);
+      
+      return result;
+    } catch (error) {
+      console.error('Error getting MySQL issues data:', error);
+      return [];
+    }
+  }
+
   async isConnected(): Promise<boolean> {
     return await this.testConnection();
+  }
+
+  async getFeedbackDetails(feedbackId: string) {
+    try {
+      // Get the main feedback record
+      const feedbackUrl = `${this.apiBaseUrl}/feedback/${feedbackId}`;
+      console.log('Fetching feedback details from:', feedbackUrl);
+      
+      const response = await fetch(feedbackUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+      }
+
+      const feedback = await response.json();
+      
+      // Find issues detected from this feedback
+      const issuesUrl = `${this.apiBaseUrl}/pending-issues?feedback_id=${feedbackId}`;
+      console.log('Fetching related issues from:', issuesUrl);
+      
+      const issuesResponse = await fetch(issuesUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      let detectedIssues: string[] = [];
+      
+      if (issuesResponse.ok) {
+        const issues = await issuesResponse.json();
+        if (issues && issues.length > 0) {
+          detectedIssues = issues.map((issue: any) => issue.title);
+        }
+      }
+      
+      // Find resolutions for this feedback's issues
+      let resolutionText = null;
+      
+      if (detectedIssues.length > 0) {
+        const resolutionsUrl = `${this.apiBaseUrl}/pending-resolutions?feedback_id=${feedbackId}`;
+        console.log('Fetching related resolutions from:', resolutionsUrl);
+        
+        const resolutionsResponse = await fetch(resolutionsUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (resolutionsResponse.ok) {
+          const resolutions = await resolutionsResponse.json();
+          if (resolutions && resolutions.length > 0) {
+            resolutionText = resolutions[0].resolution_text;
+          }
+        }
+      }
+      
+      // Combine everything into a single object
+      return {
+        ...feedback,
+        detected_issues: detectedIssues,
+        resolution: resolutionText
+      };
+    } catch (error) {
+      console.error('Error fetching feedback details:', error);
+      return null;
+    }
   }
 }
 
