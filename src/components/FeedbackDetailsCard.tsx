@@ -44,8 +44,24 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
       console.log('Fetching feedback details for ID:', feedbackId);
       const data = await mysqlService.getFeedbackDetails(feedbackId);
       if (!data) throw new Error('Feedback not found');
+      
+      // Ensure detected_issues is always an array
+      if (!data.detected_issues) {
+        data.detected_issues = [];
+      }
+      
+      console.log('Feedback details loaded successfully:', {
+        id: data.id,
+        customer_name: data.customer_name,
+        service_type: data.service_type,
+        detected_issues: data.detected_issues,
+        resolution: data.resolution ? 'Present' : 'Not present'
+      });
+      
       return data as FeedbackDetails;
     },
+    retry: 1,
+    refetchOnMount: true
   });
 
   // Legacy rule-based resolution recommendation (kept as fallback)
@@ -121,6 +137,8 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
   // Generate resolution when feedback data is loaded
   useEffect(() => {
     if (feedback && !aiResolution && !isGeneratingResolution) {
+      console.log('Feedback data received:', feedback);
+      console.log('Detected issues:', feedback.detected_issues);
       generateAIResolution(feedback);
     }
   }, [feedback]);
@@ -284,16 +302,33 @@ const FeedbackDetailsCard: React.FC<FeedbackDetailsCardProps> = ({ feedbackId, o
         </div>
 
         {/* Detected Issues */}
-        {feedback.detected_issues && feedback.detected_issues.length > 0 && (
-          <div>
-            <h4 className="font-semibold mb-2">Detected Issues</h4>
-            <div className="flex flex-wrap gap-2">
-              {feedback.detected_issues.map((issue, index) => (
-                <Badge key={index} variant="secondary">{issue}</Badge>
-              ))}
-            </div>
+        <div>
+          <h4 className="font-semibold mb-2">Detected Issues</h4>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            {feedback.detected_issues && Array.isArray(feedback.detected_issues) && feedback.detected_issues.length > 0 ? (
+              <div className="space-y-2">
+                {feedback.detected_issues.map((issue, index) => (
+                  <div key={index} className="flex items-start space-x-2">
+                    <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">{typeof issue === 'string' ? issue : (issue as any)?.title || 'Unknown issue'}</div>
+                      {/* Display debug info in development */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Issue type: {typeof issue}, Value: {JSON.stringify(issue)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm py-2">
+                No issues detected yet
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Resolution Recommendation */}
         <div className="border-t pt-4">

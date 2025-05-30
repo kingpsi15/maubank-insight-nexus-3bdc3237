@@ -422,7 +422,8 @@ class MySQLService {
 
   async getFeedbackDetails(feedbackId: string) {
     try {
-      // Get the main feedback record
+      // Get the main feedback record with associated issues and resolutions
+      // The backend /api/feedback/:id endpoint now returns all related data in one call
       const feedbackUrl = `${this.apiBaseUrl}/feedback/${feedbackId}`;
       console.log('Fetching feedback details from:', feedbackUrl);
       
@@ -437,56 +438,37 @@ class MySQLService {
         throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
 
-      const feedback = await response.json();
+      const feedbackData = await response.json();
+      console.log('Raw feedback data received:', feedbackData);
       
-      // Find issues detected from this feedback
-      const issuesUrl = `${this.apiBaseUrl}/pending-issues?feedback_id=${feedbackId}`;
-      console.log('Fetching related issues from:', issuesUrl);
-      
-      const issuesResponse = await fetch(issuesUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
+      // Process the response from the enhanced endpoint
       let detectedIssues: string[] = [];
-      
-      if (issuesResponse.ok) {
-        const issues = await issuesResponse.json();
-        if (issues && issues.length > 0) {
-          detectedIssues = issues.map((issue: any) => issue.title);
-        }
-      }
-      
-      // Find resolutions for this feedback's issues
       let resolutionText = null;
       
-      if (detectedIssues.length > 0) {
-        const resolutionsUrl = `${this.apiBaseUrl}/pending-resolutions?feedback_id=${feedbackId}`;
-        console.log('Fetching related resolutions from:', resolutionsUrl);
-        
-        const resolutionsResponse = await fetch(resolutionsUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+      // Extract issues if they exist
+      if (feedbackData.detected_issues && feedbackData.detected_issues.length > 0) {
+        console.log('Detected issues found in response:', feedbackData.detected_issues);
+        // Map issue titles to strings
+        detectedIssues = feedbackData.detected_issues.map((issue: any) => {
+          return typeof issue === 'object' ? issue.title : issue;
         });
         
-        if (resolutionsResponse.ok) {
-          const resolutions = await resolutionsResponse.json();
-          if (resolutions && resolutions.length > 0) {
-            resolutionText = resolutions[0].resolution_text;
-          }
+        // Extract resolution from the first resolution if available
+        if (feedbackData.resolutions && feedbackData.resolutions.length > 0) {
+          resolutionText = feedbackData.resolutions[0].resolution_text;
+          console.log('Resolution found:', resolutionText);
         }
       }
       
-      // Combine everything into a single object
-      return {
-        ...feedback,
+      // Return the combined data
+      const result = {
+        ...feedbackData,
         detected_issues: detectedIssues,
         resolution: resolutionText
       };
+      
+      console.log('Processed feedback data:', result);
+      return result;
     } catch (error) {
       console.error('Error fetching feedback details:', error);
       return null;

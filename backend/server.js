@@ -340,41 +340,124 @@ async function detectIssuesFromFeedback(connection, feedback) {
         
         // Fallback to manual issue detection for common problems
         if (service_type === 'ATM') {
-          if (review_text.toLowerCase().includes('receipt') || review_text.toLowerCase().includes('transaction')) {
-            console.log('[DEBUG] Fallback detection: ATM receipt/transaction issue');
-            // Create a fallback issue
-            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            await connection.execute(
-              `INSERT INTO pending_issues 
-                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-              [
-                issueId, 
-                "ATM Receipt/Transaction Issue", 
-                "Customer reported issues with ATM receipts or transaction confirmation.",
-                "ATM",
-                0.8,
-                1,
-                id
-              ]
-            );
-            
-            // Create fallback resolution
-            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            await connection.execute(
-              `INSERT INTO pending_resolutions 
-                (id, pending_issue_id, resolution_text, confidence_score, created_at)
-                VALUES (?, ?, ?, ?, NOW())`,
-              [
-                resolutionId, 
-                issueId, 
-                "1. Verify if the transaction was completed successfully in the system. 2. Inform the customer about their transaction status. 3. Check the ATM's receipt printer functionality. 4. Schedule maintenance if needed. 5. Consider implementing digital receipts via SMS or email as an alternative.", 
-                0.8
-              ]
-            );
-            
-            console.log(`[DEBUG] Created fallback issue and resolution: ${issueId}`);
-            return issueId;
+          const atmKeywords = ['receipt', 'transaction', 'not working', 'card', 'cash', 'money', 'stuck'];
+          for (const keyword of atmKeywords) {
+            if (review_text.toLowerCase().includes(keyword)) {
+              console.log(`[DEBUG] Keyword match found: ${keyword}`);
+              // Create a fallback issue
+              const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_issues 
+                  (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                  issueId, 
+                  `ATM ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                  `Customer reported an issue related to ${keyword} at the ATM.`,
+                  "ATM",
+                  0.75,
+                  1,
+                  id
+                ]
+              );
+              
+              // Create fallback resolution
+              const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_resolutions 
+                  (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                  VALUES (?, ?, ?, ?, NOW())`,
+                [
+                  resolutionId, 
+                  issueId, 
+                  `Please check the ATM for any issues related to ${keyword}. Verify the transaction status in the system and contact the customer to provide information about their transaction. Schedule maintenance if required.`, 
+                  0.75
+                ]
+              );
+              
+              console.log(`[DEBUG] Created keyword-based issue and resolution: ${issueId}`);
+              return issueId;
+            }
+          }
+        } else if (service_type === 'CoreBanking') {
+          const coreBankingKeywords = ['employee', 'staff', 'rude', 'arrogant', 'unhelpful', 'slow', 'wait', 'queue', 'counter', 'teller', 'attitude', 'behavior', 'unprofessional'];
+          for (const keyword of coreBankingKeywords) {
+            if (review_text.toLowerCase().includes(keyword)) {
+              console.log(`[DEBUG] CoreBanking keyword match found: ${keyword}`);
+              // Create a fallback issue
+              const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_issues 
+                  (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                  issueId, 
+                  `Staff ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                  `Customer reported an issue related to ${keyword} with bank staff.`,
+                  "CoreBanking",
+                  0.85,
+                  1,
+                  id
+                ]
+              );
+              
+              // Create fallback resolution
+              const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_resolutions 
+                  (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                  VALUES (?, ?, ?, ?, NOW())`,
+                [
+                  resolutionId, 
+                  issueId, 
+                  `1. Review customer complaint about bank staff ${keyword} issue. 2. Identify the specific employee involved. 3. Schedule a meeting with the employee to discuss the feedback. 4. Provide additional customer service training if needed. 5. Contact the customer to apologize and address their concerns. 6. Document the incident and follow up to ensure improvement.`, 
+                  0.85
+                ]
+              );
+              
+              console.log(`[DEBUG] Created CoreBanking staff issue and resolution: ${issueId}`);
+              return issueId;
+            }
+          }
+        } else if (service_type === 'OnlineBanking') {
+          const onlineBankingKeywords = ['login', 'password', 'error', 'failed', 'website', 'app', 'mobile', 'transaction', 'transfer', 'security', 'timeout'];
+          for (const keyword of onlineBankingKeywords) {
+            if (review_text.toLowerCase().includes(keyword)) {
+              console.log(`[DEBUG] OnlineBanking keyword match found: ${keyword}`);
+              // Create a fallback issue
+              const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_issues 
+                  (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                  issueId, 
+                  `Online Banking ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                  `Customer reported an issue related to ${keyword} in the online banking platform.`,
+                  "OnlineBanking",
+                  0.80,
+                  1,
+                  id
+                ]
+              );
+              
+              // Create fallback resolution
+              const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              await connection.execute(
+                `INSERT INTO pending_resolutions 
+                  (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                  VALUES (?, ?, ?, ?, NOW())`,
+                [
+                  resolutionId, 
+                  issueId, 
+                  `1. Verify the specific online banking issue related to ${keyword}. 2. Check system logs for errors around the time of the incident. 3. Provide the customer with troubleshooting steps. 4. If needed, escalate to the IT department for technical investigation. 5. Follow up with the customer to confirm resolution.`, 
+                  0.80
+                ]
+              );
+              
+              console.log(`[DEBUG] Created OnlineBanking issue and resolution: ${issueId}`);
+              return issueId;
+            }
           }
         }
         
@@ -425,6 +508,86 @@ async function detectIssuesFromFeedback(connection, feedback) {
             );
             
             console.log(`[DEBUG] Created keyword-based issue and resolution: ${issueId}`);
+            return issueId;
+          }
+        }
+      } else if (service_type === 'CoreBanking') {
+        const coreBankingKeywords = ['employee', 'staff', 'rude', 'arrogant', 'unhelpful', 'slow', 'wait', 'queue', 'counter', 'teller', 'attitude', 'behavior', 'unprofessional'];
+        for (const keyword of coreBankingKeywords) {
+          if (review_text.toLowerCase().includes(keyword)) {
+            console.log(`[DEBUG] CoreBanking keyword match found: ${keyword}`);
+            // Create a fallback issue
+            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_issues 
+                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+              [
+                issueId, 
+                `Staff ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                `Customer reported an issue related to ${keyword} with bank staff.`,
+                "CoreBanking",
+                0.85,
+                1,
+                id
+              ]
+            );
+            
+            // Create fallback resolution
+            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_resolutions 
+                (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                VALUES (?, ?, ?, ?, NOW())`,
+              [
+                resolutionId, 
+                issueId, 
+                `1. Review customer complaint about bank staff ${keyword} issue. 2. Identify the specific employee involved. 3. Schedule a meeting with the employee to discuss the feedback. 4. Provide additional customer service training if needed. 5. Contact the customer to apologize and address their concerns. 6. Document the incident and follow up to ensure improvement.`, 
+                0.85
+              ]
+            );
+            
+            console.log(`[DEBUG] Created CoreBanking staff issue and resolution: ${issueId}`);
+            return issueId;
+          }
+        }
+      } else if (service_type === 'OnlineBanking') {
+        const onlineBankingKeywords = ['login', 'password', 'error', 'failed', 'website', 'app', 'mobile', 'transaction', 'transfer', 'security', 'timeout'];
+        for (const keyword of onlineBankingKeywords) {
+          if (review_text.toLowerCase().includes(keyword)) {
+            console.log(`[DEBUG] OnlineBanking keyword match found: ${keyword}`);
+            // Create a fallback issue
+            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_issues 
+                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+              [
+                issueId, 
+                `Online Banking ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                `Customer reported an issue related to ${keyword} in the online banking platform.`,
+                "OnlineBanking",
+                0.80,
+                1,
+                id
+              ]
+            );
+            
+            // Create fallback resolution
+            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            await connection.execute(
+              `INSERT INTO pending_resolutions 
+                (id, pending_issue_id, resolution_text, confidence_score, created_at)
+                VALUES (?, ?, ?, ?, NOW())`,
+              [
+                resolutionId, 
+                issueId, 
+                `1. Verify the specific online banking issue related to ${keyword}. 2. Check system logs for errors around the time of the incident. 3. Provide the customer with troubleshooting steps. 4. If needed, escalate to the IT department for technical investigation. 5. Follow up with the customer to confirm resolution.`, 
+                0.80
+              ]
+            );
+            
+            console.log(`[DEBUG] Created OnlineBanking issue and resolution: ${issueId}`);
             return issueId;
           }
         }
@@ -1078,6 +1241,7 @@ app.get('/api/feedback/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Get feedback details
     const [rows] = await pool.execute(
       'SELECT * FROM feedback WHERE id = ?',
       [id]
@@ -1087,7 +1251,118 @@ app.get('/api/feedback/:id', async (req, res) => {
       return res.status(404).json({ error: 'Feedback not found' });
     }
     
-    res.json(rows[0]);
+    const feedback = rows[0];
+    
+    // Check if this is an employee-related issue but incorrectly classified
+    if (feedback.review_text && 
+        (feedback.review_text.toLowerCase().includes('employee') || 
+         feedback.review_text.toLowerCase().includes('staff') || 
+         feedback.review_text.toLowerCase().includes('teller') ||
+         feedback.review_text.toLowerCase().includes('counter') ||
+         feedback.review_text.toLowerCase().includes('rude') ||
+         feedback.review_text.toLowerCase().includes('arrogant') ||
+         feedback.review_text.toLowerCase().includes('unhelpful') ||
+         feedback.review_text.toLowerCase().includes('attitude') ||
+         feedback.review_text.toLowerCase().includes('behavior')) && 
+        feedback.service_type !== 'CoreBanking') {
+      // This is likely a CoreBanking issue that was misclassified
+      console.log(`[INFO] Detected employee-related issue in feedback ${id} but was classified as ${feedback.service_type}. Correcting to CoreBanking.`);
+      
+      // Update the service type in the database
+      await pool.execute(
+        'UPDATE feedback SET service_type = ? WHERE id = ?',
+        ['CoreBanking', id]
+      );
+      
+      // Update in-memory copy as well
+      feedback.service_type = 'CoreBanking';
+    }
+    
+    // Get detected issues for this feedback
+    const [issues] = await pool.execute(
+      'SELECT * FROM pending_issues WHERE detected_from_feedback_id = ?',
+      [id]
+    );
+    
+    // If no issues are detected but this is a negative feedback about staff, create one now
+    if (issues.length === 0 && feedback.review_rating <= 3 && 
+        feedback.service_type === 'CoreBanking' &&
+        (feedback.review_text.toLowerCase().includes('employee') || 
+         feedback.review_text.toLowerCase().includes('staff') || 
+         feedback.review_text.toLowerCase().includes('rude') ||
+         feedback.review_text.toLowerCase().includes('arrogant'))) {
+      
+      console.log(`[INFO] Creating employee issue for feedback ${id} as none was detected previously`);
+      
+      const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      await pool.execute(
+        `INSERT INTO pending_issues 
+          (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          issueId, 
+          "Staff Behavior Issue", 
+          "Customer reported issues with bank staff behavior or attitude.",
+          "CoreBanking",
+          0.9,
+          1,
+          id
+        ]
+      );
+      
+      const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      await pool.execute(
+        `INSERT INTO pending_resolutions 
+          (id, pending_issue_id, resolution_text, confidence_score, created_at)
+          VALUES (?, ?, ?, ?, NOW())`,
+        [
+          resolutionId, 
+          issueId, 
+          "1. Review the customer complaint in detail. 2. Identify the specific employee involved. 3. Schedule a meeting with the employee to discuss the feedback. 4. Provide additional customer service training as needed. 5. Contact the customer to apologize and address their concerns. 6. Document the incident and follow up to ensure improvement.", 
+          0.9
+        ]
+      );
+      
+      // Refresh issues query after creating a new one
+      const [refreshedIssues] = await pool.execute(
+        'SELECT * FROM pending_issues WHERE detected_from_feedback_id = ?',
+        [id]
+      );
+      
+      // Replace the issues array with the refreshed data
+      issues = refreshedIssues;
+    }
+    
+    // Get resolutions for these issues
+    let resolutions = [];
+    if (issues.length > 0) {
+      const issueIds = issues.map(issue => issue.id);
+      const placeholders = issueIds.map(() => '?').join(',');
+      
+      const [resolutionRows] = await pool.execute(
+        `SELECT * FROM pending_resolutions WHERE pending_issue_id IN (${placeholders})`,
+        issueIds
+      );
+      
+      resolutions = resolutionRows;
+    }
+    
+    // Format the response properly
+    const formattedIssues = issues.map(issue => ({
+      id: issue.id,
+      title: issue.title,
+      description: issue.description,
+      category: issue.category,
+      confidence_score: issue.confidence_score,
+      created_at: issue.created_at
+    }));
+    
+    // Add issues and resolutions to the response
+    res.json({
+      ...feedback,
+      detected_issues: formattedIssues,
+      resolutions: resolutions
+    });
   } catch (error) {
     console.error('Error fetching feedback by ID:', error);
     res.status(500).json({ 
