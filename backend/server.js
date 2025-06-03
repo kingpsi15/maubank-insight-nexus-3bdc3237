@@ -1,4 +1,4 @@
-const express = require('express');  
+const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 require('dotenv').config();
@@ -6,7 +6,8 @@ const multer = require('multer');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
+// Remove: const axios = require('axios');
+const axios = require('axios'); // Add Ollama import
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,7 +28,7 @@ const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'root_123',
+  password: process.env.DB_PASSWORD || 'Hariom13##',
   database: process.env.DB_NAME || 'feedback_db'
 };
 
@@ -126,6 +127,9 @@ app.get('/api/feedback', async (req, res) => {
 
     query += ' ORDER BY created_at DESC';
 
+    console.log('Final SQL Query:', query);
+    console.log('Query Params:', params);
+
     const [rows] = await pool.execute(query, params);
 
     res.json(rows);
@@ -139,249 +143,183 @@ app.get('/api/feedback', async (req, res) => {
   }
 });
 
-// Add OpenAI API configuration
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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';
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+// Add Ollama configuration
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral:7b-instruct';
+const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
+const OLLAMA_TIMEOUT = parseInt(process.env.OLLAMA_TIMEOUT) || 30000;
+const OLLAMA_RETRIES = parseInt(process.env.OLLAMA_RETRIES) || 3;
 
-// Validate OpenAI API key on startup
+// Validate Ollama connection on startup using axios
 (async () => {
   try {
-    console.log('Validating OpenAI API key...');
-    const response = await axios.post(
-      OPENAI_API_URL,
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: 'Hello' }],
-        max_tokens: 5
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
-        }
-      }
-    );
-    console.log('OpenAI API key is valid.');
+    console.log('Validating Ollama connection...');
+    const response = await axios.post(`${OLLAMA_HOST}/api/generate`, {
+      model: OLLAMA_MODEL,
+      prompt: 'Hello',
+      stream: false
+    }, { timeout: OLLAMA_TIMEOUT });
+    
+    console.log('Ollama connection is valid and model is ready.');
   } catch (error) {
-    console.error('Error validating OpenAI API key:', error.message);
-    console.error('API response:', error.response?.data);
-    console.warn('⚠️ Issue detection might not work properly due to invalid OpenAI API key!');
-    console.warn('⚠️ Set a valid API key in the OPENAI_API_KEY environment variable or update the hardcoded key.');
+    console.error('Error validating Ollama connection:', error.message);
+    console.warn('⚠️ Issue detection might not work properly due to Ollama connection issues!');
+    console.warn('⚠️ Ensure Ollama is running and mistral:7b-instruct model is available.');
   }
 })();
 
-// Issue detection helper function
+
+// Enhanced Ollama configuration with timeout and retry
+const ollamaConfig = {
+  timeout: 30000, // 30 second timeout
+  retries: 3,
+  retryDelay: 1000 // 1 second between retries
+};
+
+// Function to call Ollama with retry logic
+
+async function callLocalLLM(prompt) {
+  try {
+    const response = await axios.post(`${OLLAMA_HOST}/api/generate`, {
+      model: OLLAMA_MODEL,
+      prompt: prompt,
+      stream: false
+    });
+    return response.data.response.trim();
+  } catch (err) {
+    console.error('[ERROR] callLocalLLM failed:', err.message);
+    throw err;
+  }
+}
+
 async function detectIssuesFromFeedback(connection, feedback) {
   try {
     console.log(`[DEBUG] Processing feedback: ${feedback.id}, Rating: ${feedback.review_rating}, Sentiment: ${feedback.sentiment}`);
     console.log(`[DEBUG] Review text: ${feedback.review_text}`);
 
-    // Skip positive feedback (rating 4 or 5)
+    // Skip positive feedback
     if (feedback.review_rating >= 4) {
       console.log('[DEBUG] Skipping positive feedback (rating ≥ 4)');
       return null;
     }
 
     const { id, review_text, service_type, review_rating } = feedback;
+
     if (!review_text || review_text.trim().length < 10) {
       console.log('[DEBUG] Skipping feedback with insufficient text');
       return null;
     }
 
-    // First use OpenAI to detect the issue
-    console.log('[DEBUG] Using OpenAI for issue detection');
+    // Use Ollama for issue detection
+    console.log('[DEBUG] Using Ollama for issue detection');
     try {
-      // Enhanced prompt with more explicit examples for better detection
-      const prompt = `
-        Analyze this bank customer feedback and identify potential issues.
-        
-        Service Type: ${service_type}
-        Rating: ${review_rating}/5
-        Feedback: "${review_text}"
-        
-        Examples of issues:
-        - For ATM: "ATM not dispensing cash", "ATM receipt not printing", "Card stuck in ATM"
-        - For OnlineBanking: "Login issues", "Slow website", "Transaction failed"
-        - For CoreBanking: "Long waiting time", "Staff was unhelpful", "Process took too long"
-        
-        If there is a legitimate issue, extract the following information in JSON format:
-        {
-          "title": "Brief issue title",
-          "description": "Detailed description of the issue",
-          "category": "${service_type}",
-          "confidence_score": decimal between 0 and 1,
-          "resolution": "Detailed step-by-step resolution recommendation for bank staff"
-        }
-        
-        If there is no legitimate issue, return null.
-        
-        The resolution should be actionable, specific, and follow best practices in banking.
-      `;
+      const prompt = `<s>[INST] You are a banking issue detection expert. Analyze this customer feedback and determine if there is a legitimate operational issue.
 
-      console.log('[DEBUG] Sending request to OpenAI API');
-      
-      const response = await axios.post(
-        OPENAI_API_URL,
-        {
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-          max_tokens: 800
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`
-          }
-        }
-      );
+Service: ${service_type}
+Rating: ${review_rating}/5
+Feedback: "${review_text}"
 
-      console.log('[DEBUG] Received response from OpenAI API');
-      const content = response.data.choices[0].message.content.trim();
-      console.log('[DEBUG] OpenAI response content:', content);
-      
-      // Parse the JSON response
-      try {
-        let result = null;
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        
-        if (jsonMatch) {
-          result = JSON.parse(jsonMatch[0]);
-          console.log('[DEBUG] Successfully parsed JSON from OpenAI response');
-        } else {
-          // If no JSON detected but the content contains useful info, create a simple issue
-          console.log('[DEBUG] No JSON found in response, checking for manual detection');
-          
-          // Fallback method if OpenAI doesn't return proper JSON
-          if (service_type === 'ATM' && review_text.toLowerCase().includes('receipt')) {
-            console.log('[DEBUG] Manual detection: ATM receipt issue');
-            result = {
-              title: "ATM Receipt Issue",
-              description: "Customer reported issues with ATM receipts not being provided or printed correctly.",
-              category: "ATM",
-              confidence_score: 0.85,
-              resolution: "1. Check the receipt printer status in the ATM. 2. Verify if the transaction was completed successfully. 3. Provide transaction confirmation to the customer via SMS or email. 4. Schedule maintenance for the receipt printer if needed."
-            };
-          }
-        }
-        
-        if (result === null) {
-          console.log('[DEBUG] No issue detected in the feedback');
-          return null;
-        }
-        
-        console.log('[DEBUG] Issue detected:', result.title);
-        const { title, description, category, confidence_score, resolution } = result;
-        
-        // Now check if we have a similar issue already in the database
-        const [existingSimilarIssues] = await connection.execute(
-          'SELECT * FROM pending_issues WHERE category = ? AND (title LIKE ? OR description LIKE ?) LIMIT 5',
-          [category, `%${title.substring(0, 50)}%`, `%${description.substring(0, 50)}%`]
-        );
+IMPORTANT: Only identify legitimate operational issues, not general complaints.
 
-        if (existingSimilarIssues && existingSimilarIssues.length > 0) {
-          // We found a similar issue, increment the feedback count
-          const existingIssue = existingSimilarIssues[0];
-          await connection.execute(
-            'UPDATE pending_issues SET feedback_count = feedback_count + 1 WHERE id = ?',
-            [existingIssue.id]
-          );
-          console.log(`[DEBUG] Found similar existing issue: ${existingIssue.id}, incrementing count`);
-          return existingIssue.id;
-        }
+Examples of legitimate issues:
+- ATM: "Machine ate my card", "No cash dispensed", "Receipt printer broken"
+- OnlineBanking: "Cannot login", "App crashes", "Transaction failed"
+- CoreBanking: "System down", "Long waiting times due to technical issues"
 
-        // No similar issue found, create a new one
-        const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-        
-        // Save the new issue to database
-        await connection.execute(
-          `INSERT INTO pending_issues 
-            (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-          [issueId, title, description, category, confidence_score, 1, id]
-        );
-        
-        console.log(`[DEBUG] Created new issue with LLM: ${issueId}`);
-        
-        // Store the resolution
-        const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-        await connection.execute(
-          `INSERT INTO pending_resolutions 
-            (id, pending_issue_id, resolution_text, confidence_score, created_at)
-            VALUES (?, ?, ?, ?, NOW())`,
-          [resolutionId, issueId, resolution || '', confidence_score]
-        );
-        
-        console.log(`[DEBUG] Created resolution for issue: ${resolutionId}`);
-        
-        return issueId;
-      } catch (error) {
-        console.error('[DEBUG] Error parsing OpenAI response:', error);
-        
-        // Fallback to manual issue detection for common problems
-        if (service_type === 'ATM') {
-          if (review_text.toLowerCase().includes('receipt') || review_text.toLowerCase().includes('transaction')) {
-            console.log('[DEBUG] Fallback detection: ATM receipt/transaction issue');
-            // Create a fallback issue
-            const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            await connection.execute(
-              `INSERT INTO pending_issues 
-                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-              [
-                issueId, 
-                "ATM Receipt/Transaction Issue", 
-                "Customer reported issues with ATM receipts or transaction confirmation.",
-                "ATM",
-                0.8,
-                1,
-                id
-              ]
-            );
-            
-            // Create fallback resolution
-            const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            await connection.execute(
-              `INSERT INTO pending_resolutions 
-                (id, pending_issue_id, resolution_text, confidence_score, created_at)
-                VALUES (?, ?, ?, ?, NOW())`,
-              [
-                resolutionId, 
-                issueId, 
-                "1. Verify if the transaction was completed successfully in the system. 2. Inform the customer about their transaction status. 3. Check the ATM's receipt printer functionality. 4. Schedule maintenance if needed. 5. Consider implementing digital receipts via SMS or email as an alternative.", 
-                0.8
-              ]
-            );
-            
-            console.log(`[DEBUG] Created fallback issue and resolution: ${issueId}`);
-            return issueId;
-          }
+If you find a legitimate issue, respond with ONLY this JSON format:
+{
+  "title": "Brief issue title (max 50 chars)",
+  "description": "Detailed description (max 200 chars)",
+  "category": "${service_type}",
+  "confidence_score": 0.85,
+  "resolution": "Step-by-step resolution for bank staff"
+}
+
+If no legitimate issue exists, respond with: null [/INST]`;
+
+      const response = await axios.post(`${OLLAMA_HOST}/api/generate`, {
+        model: OLLAMA_MODEL,
+        prompt,
+        stream: false
+      });
+
+      const content = response.data.response.trim();
+      console.log('[DEBUG] Ollama response content:', content);
+
+      let result = null;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+        console.log('[DEBUG] Successfully parsed JSON from Ollama response');
+      } else {
+        console.log('[DEBUG] No JSON found in response, checking for manual detection');
+        if (service_type === 'ATM' && review_text.toLowerCase().includes('receipt')) {
+          result = {
+            title: "ATM Receipt Issue",
+            description: "Customer reported issues with ATM receipts not being provided or printed correctly.",
+            category: "ATM",
+            confidence_score: 0.85,
+            resolution: "1. Check the receipt printer status in the ATM. 2. Verify if the transaction was completed successfully. 3. Provide transaction confirmation via SMS/email. 4. Schedule maintenance if needed."
+          };
         }
-        
+      }
+
+      if (result === null) {
+        console.log('[DEBUG] No issue detected in the feedback');
         return null;
       }
+
+      const { title, description, category, confidence_score, resolution } = result;
+
+      const [existingSimilarIssues] = await connection.execute(
+        'SELECT * FROM pending_issues WHERE category = ? AND (title LIKE ? OR description LIKE ?) LIMIT 5',
+        [category, `%${title.substring(0, 50)}%`, `%${description.substring(0, 50)}%`]
+      );
+
+      if (existingSimilarIssues.length > 0) {
+        const existingIssue = existingSimilarIssues[0];
+        await connection.execute(
+          'UPDATE pending_issues SET feedback_count = feedback_count + 1 WHERE id = ?',
+          [existingIssue.id]
+        );
+        console.log(`[DEBUG] Found similar existing issue: ${existingIssue.id}, incrementing count`);
+        return existingIssue.id;
+      }
+
+      const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      await connection.execute(
+        `INSERT INTO pending_issues 
+         (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [issueId, title, description, category, confidence_score, 1, id]
+      );
+
+      const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      await connection.execute(
+        `INSERT INTO pending_resolutions 
+         (id, pending_issue_id, resolution_text, confidence_score, created_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [resolutionId, issueId, resolution || '', confidence_score]
+      );
+
+      console.log(`[DEBUG] Created new issue and resolution: ${issueId}, ${resolutionId}`);
+      return issueId;
+
     } catch (error) {
-      console.error('[DEBUG] Error calling OpenAI API for issue detection:', error);
-      console.error('[DEBUG] Error details:', error.response?.data || error.message);
-      
-      // Fallback to keyword-based detection
-      console.log('[DEBUG] Using fallback keyword detection');
-      
-      // Check for common keywords by service type
+      console.error('[DEBUG] Error calling Ollama:', error.message);
+
+      // Keyword-based fallback
       if (service_type === 'ATM') {
-        const atmKeywords = ['receipt', 'transaction', 'not working', 'card', 'cash', 'money', 'stuck'];
-        for (const keyword of atmKeywords) {
+        const keywords = ['receipt', 'transaction', 'not working', 'card', 'cash', 'money', 'stuck'];
+        for (const keyword of keywords) {
           if (review_text.toLowerCase().includes(keyword)) {
-            console.log(`[DEBUG] Keyword match found: ${keyword}`);
-            // Create a fallback issue
             const issueId = 'pending_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
             await connection.execute(
               `INSERT INTO pending_issues 
-                (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+               (id, title, description, category, confidence_score, feedback_count, detected_from_feedback_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
               [
-                issueId, 
-                `ATM ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`, 
+                issueId,
+                `ATM ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Issue`,
                 `Customer reported an issue related to ${keyword} at the ATM.`,
                 "ATM",
                 0.75,
@@ -389,31 +327,31 @@ async function detectIssuesFromFeedback(connection, feedback) {
                 id
               ]
             );
-            
-            // Create fallback resolution
+
             const resolutionId = 'resolution_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
             await connection.execute(
               `INSERT INTO pending_resolutions 
-                (id, pending_issue_id, resolution_text, confidence_score, created_at)
-                VALUES (?, ?, ?, ?, NOW())`,
+               (id, pending_issue_id, resolution_text, confidence_score, created_at)
+               VALUES (?, ?, ?, ?, NOW())`,
               [
-                resolutionId, 
-                issueId, 
-                `Please check the ATM for any issues related to ${keyword}. Verify the transaction status in the system and contact the customer to provide information about their transaction. Schedule maintenance if required.`, 
+                resolutionId,
+                issueId,
+                `Check ATM for issues related to ${keyword}. Verify transaction status. Contact customer. Schedule maintenance if required.`,
                 0.75
               ]
             );
-            
-            console.log(`[DEBUG] Created keyword-based issue and resolution: ${issueId}`);
+
+            console.log(`[DEBUG] Fallback issue created: ${issueId}`);
             return issueId;
           }
         }
       }
-      
+
       return null;
     }
-  } catch (error) {
-    console.error('[DEBUG] Error in issue detection:', error);
+
+  } catch (err) {
+    console.error('[DEBUG] Unexpected error in issue detection:', err.message);
     return null;
   }
 }
