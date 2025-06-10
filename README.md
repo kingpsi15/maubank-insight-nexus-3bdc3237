@@ -8,7 +8,18 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Download ollama from the following website
+https://ollama.com/download
+
+# Step 5: Install Ollama with the standard settings
+
+# Step 6: Run mistral:7b-instruct in command prompt or git bash
+ollama run mistral:7b-instruct
+
+# Step 7: In the command prompt, run the backend code. Ensure that you enter the right password in the .env and server codes.
+node <path_to_server.js>
+
+# Step 8: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
