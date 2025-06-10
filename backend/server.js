@@ -707,7 +707,7 @@ app.get('/api/pending-issues', async (req, res) => {
         feedback
       };
     }));
-
+    console.log('[DEBUG] Sending pending issues:', JSON.stringify(result, null, 2));
     res.json(result);
   } catch (error) {
     console.error('Error fetching pending issues:', error);
